@@ -1,0 +1,25 @@
+:root {
+  --bg: #faf8f4; --panel: #fff; --border: #e3ddd2; --text: #1d1d20;
+  --muted: #6a6a72; --accent: #c8643c;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1e1e22; --panel: #2a2a30; --border: #3a3a42; --text: #e8e8ea; --muted: #9a9aa2; }
+}
+* { box-sizing: border-box; }
+body { font: 15px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 24px; }
+main { max-width: 620px; margin: 0 auto; }
+h1 { font-size: 22px; }
+h2 { font-size: 16px; margin-bottom: 8px; }
+section { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin: 14px 0; }
+label { display: block; margin: 10px 0; font-size: 14px; }
+label.check { display: flex; align-items: center; gap: 8px; }
+label.check input { accent-color: var(--accent); }
+input[type=password], input[type=number] {
+  width: 100%; margin-top: 4px; padding: 8px; font: inherit;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px;
+}
+input[type=checkbox] { width: auto; margin: 0; }
+.muted { color: var(--muted); font-size: 13px; }
+.muted a { color: var(--accent); }
+.actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+button { font: inherit; padding: 9px 18px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }

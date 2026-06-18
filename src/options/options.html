@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="options.css" />
+    <title>AI Sidebar — Réglages</title>
+  </head>
+  <body>
+    <main>
+      <h1>AI Sidebar — Réglages</h1>
+      <p class="muted">
+        Vos clés API sont stockées <b>localement</b> dans ce navigateur
+        (<code>storage.local</code>) et ne sont envoyées qu'aux API que vous
+        choisissez (Anthropic / OpenRouter). Aucune autre transmission.
+      </p>
+
+      <section>
+        <h2>Claude (Anthropic)</h2>
+        <label>Clé API
+          <input type="password" id="anthropicKey" placeholder="sk-ant-..." />
+        </label>
+        <p class="muted">Console : <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></p>
+      </section>
+
+      <section>
+        <h2>OpenRouter</h2>
+        <label>Clé API
+          <input type="password" id="openrouterKey" placeholder="sk-or-..." />
+        </label>
+        <p class="muted">Clés : <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a></p>
+      </section>
+
+      <section>
+        <h2>Mode agent &amp; contexte</h2>
+        <label class="check"><input type="checkbox" id="agentMode" /> Activer le mode agent par défaut</label>
+        <label class="check"><input type="checkbox" id="confirmActions" /> Demander confirmation avant chaque action (clic, saisie, navigation…)</label>
+        <label class="check"><input type="checkbox" id="includePageContext" /> Injecter le contenu de la page active (mode chat)</label>
+        <label>Taille max du contexte de page (caractères)
+          <input type="number" id="maxPageChars" min="1000" max="100000" step="1000" />
+        </label>
+      </section>
+
+      <div class="actions">
+        <button id="save">Enregistrer</button>
+        <span id="status" class="muted"></span>
+      </div>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

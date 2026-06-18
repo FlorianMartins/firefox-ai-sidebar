@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="sidebar.css" />
+    <title>AI Sidebar</title>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="row">
+        <select id="provider" title="Fournisseur">
+          <option value="anthropic">Claude</option>
+          <option value="openrouter">OpenRouter</option>
+        </select>
+        <select id="model" title="Modèle"></select>
+      </div>
+      <div class="row">
+        <label class="toggle" title="Le modèle peut agir dans le navigateur">
+          <input type="checkbox" id="agentMode" />
+          <span>Agent</span>
+        </label>
+        <label class="toggle" title="Injecter le contenu de la page active">
+          <input type="checkbox" id="pageCtx" />
+          <span>📄</span>
+        </label>
+        <button id="newChat" title="Nouvelle conversation">＋</button>
+        <button id="openOptions" title="Réglages">⚙</button>
+      </div>
+    </header>
+
+    <main id="messages" class="messages">
+      <div class="empty" id="empty">
+        <p>Sidebar IA — Claude &amp; OpenRouter.</p>
+        <p class="muted">
+          Renseignez votre clé API dans <a href="#" id="emptyOptions">⚙ Réglages</a>,
+          puis posez une question. Activez <b>Agent</b> pour laisser l'IA interagir
+          avec la page et les onglets.
+        </p>
+      </div>
+    </main>
+
+    <div id="confirmBar" class="confirm hidden">
+      <span id="confirmText"></span>
+      <div class="confirm-actions">
+        <button id="confirmAllow" class="ok">Autoriser</button>
+        <button id="confirmDeny" class="no">Refuser</button>
+      </div>
+    </div>
+
+    <footer class="composer">
+      <textarea id="input" rows="2" placeholder="Écrivez un message…"></textarea>
+      <button id="send" title="Envoyer">➤</button>
+      <button id="stop" class="hidden" title="Stop">■</button>
+    </footer>
+
+    <script type="module" src="sidebar.js"></script>
+  </body>
+</html>
