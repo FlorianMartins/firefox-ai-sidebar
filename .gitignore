@@ -3,3 +3,4 @@ web-ext-artifacts/
 *.zip
 *.xpi
 .DS_Store
+.claude/

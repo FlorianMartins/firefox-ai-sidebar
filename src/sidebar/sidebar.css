@@ -74,4 +74,50 @@ button:hover { border-color: var(--accent); }
 .composer button { min-width: 38px; font-size: 16px; }
 #send { background: var(--accent); color: #fff; border-color: var(--accent); }
 
+/* --- Rendu Markdown (messages assistant) --- */
+.msg.assistant { white-space: normal; }
+.msg.assistant > :first-child { margin-top: 0; }
+.msg.assistant > :last-child { margin-bottom: 0; }
+.msg.assistant p { margin: 6px 0; }
+.msg.assistant h1, .msg.assistant h2, .msg.assistant h3 { margin: 10px 0 6px; line-height: 1.25; }
+.msg.assistant h1 { font-size: 18px; }
+.msg.assistant h2 { font-size: 16px; }
+.msg.assistant h3 { font-size: 15px; }
+.msg.assistant ul, .msg.assistant ol { margin: 6px 0; padding-left: 20px; }
+.msg.assistant li { margin: 2px 0; }
+.msg.assistant a { color: var(--accent); }
+.msg.assistant blockquote {
+  margin: 6px 0; padding: 2px 10px; border-left: 3px solid var(--border); color: var(--muted);
+}
+.msg.assistant table { border-collapse: collapse; margin: 6px 0; font-size: 13px; }
+.msg.assistant th, .msg.assistant td { border: 1px solid var(--border); padding: 4px 8px; }
+.msg.assistant :not(pre) > code {
+  background: var(--tool); padding: 1px 5px; border-radius: 4px;
+  font-family: ui-monospace, monospace; font-size: 12.5px;
+}
+.msg.assistant hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+
+/* --- Blocs de code + artifacts --- */
+.code-wrap { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 8px 0; }
+.code-bar {
+  display: flex; align-items: center; gap: 6px; padding: 4px 8px;
+  background: var(--tool); border-bottom: 1px solid var(--border);
+}
+.code-lang { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-right: auto; }
+.code-btn {
+  font-size: 11px; padding: 2px 8px; border-radius: 5px; background: var(--bg);
+  border: 1px solid var(--border); color: var(--text); cursor: pointer;
+}
+.code-btn:hover { border-color: var(--accent); }
+.code-wrap pre {
+  margin: 0; padding: 10px; overflow-x: auto; background: var(--bg);
+  font-family: ui-monospace, monospace; font-size: 12.5px; line-height: 1.45;
+}
+.code-wrap pre code { background: none; padding: 0; }
+.artifact-slot:empty { display: none; }
+.artifact-frame {
+  width: 100%; border: 0; border-top: 1px solid var(--border);
+  background: #fff; resize: vertical; overflow: auto; display: block;
+}
+
 .hidden { display: none !important; }

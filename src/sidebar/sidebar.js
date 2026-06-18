@@ -2,6 +2,7 @@ import { getSettings, setSettings } from "../lib/storage.js";
 import { makeProvider } from "../lib/providers.js";
 import { buildSystemPrompt, activeTools, runConversation } from "../lib/agent.js";
 import { executeTool } from "../lib/tools.js";
+import { configureMarkdown, renderMarkdown, enhanceArtifacts } from "../lib/markdown.js";
 
 const MODELS = {
   anthropic: [
@@ -42,6 +43,7 @@ let history = [];
 let abortController = null;
 
 async function init() {
+  configureMarkdown();
   settings = await getSettings();
   els.provider.value = settings.provider;
   populateModels();
@@ -193,14 +195,29 @@ async function onSend() {
   abortController = new AbortController();
 
   let assistantEl = null;
+  let assistantRaw = "";
+  const finalizeAssistant = () => {
+    if (assistantEl) {
+      assistantEl.innerHTML = renderMarkdown(assistantRaw);
+      enhanceArtifacts(assistantEl);
+    }
+    assistantEl = null;
+    assistantRaw = "";
+  };
   const onText = (delta) => {
-    if (!assistantEl) assistantEl = addMessage("assistant", "");
-    assistantEl.textContent += delta;
+    if (!assistantEl) {
+      assistantEl = addMessage("assistant", "");
+      assistantRaw = "";
+    }
+    assistantRaw += delta;
+    // Rendu Markdown en direct ; les artifacts (iframes) sont activés à la
+    // finalisation pour éviter de ré-exécuter à chaque token.
+    assistantEl.innerHTML = renderMarkdown(assistantRaw);
     els.messages.scrollTop = els.messages.scrollHeight;
   };
   const onToolStart = (call) => {
+    finalizeAssistant();
     addMessage("tool", `→ ${call.name}(${JSON.stringify(call.input).slice(0, 100)})`);
-    assistantEl = null; // les prochains deltas créeront un nouveau bloc
   };
   const onToolEnd = (call, out) => {
     const summary = out && out.error ? `✗ ${out.error}` : "✓ ok";
@@ -224,6 +241,7 @@ async function onSend() {
     if (e && e.name === "AbortError") addMessage("tool", "■ Interrompu.");
     else addMessage("error", "Erreur : " + (e && e.message ? e.message : String(e)));
   } finally {
+    finalizeAssistant();
     els.send.classList.remove("hidden");
     els.stop.classList.add("hidden");
     abortController = null;
