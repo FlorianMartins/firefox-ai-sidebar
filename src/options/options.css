@@ -14,7 +14,8 @@ section { background: var(--panel); border: 1px solid var(--border); border-radi
 label { display: block; margin: 10px 0; font-size: 14px; }
 label.check { display: flex; align-items: center; gap: 8px; }
 label.check input { accent-color: var(--accent); }
-input[type=password], input[type=number] {
+h3 { font-size: 14px; margin: 0 0 6px; }
+input[type=password], input[type=number], input[type=text], select {
   width: 100%; margin-top: 4px; padding: 8px; font: inherit;
   background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px;
 }

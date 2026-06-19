@@ -1,15 +1,19 @@
-// Clients API. Deux providers exposant une interface commune :
-//   runTurn({ system, history, tools, onText, signal })
+// Clients API. Deux familles partageant une interface commune :
+//   runTurn({ system, history, tools, onText, onThink, signal })
 //     -> { message, toolCalls:[{id,name,input}], stopReason, text }
-//   formatToolResults(results) -> message natif à pousser dans l'historique
+//   formatToolResults(results) -> message(s) natif(s) à pousser dans l'historique
 //
 // `history` et `message` sont au format NATIF du provider (Anthropic vs OpenAI),
 // pour rester fidèle à chaque API. La boucle agent (agent.js) ne manipule que la
 // liste normalisée `toolCalls`.
+//
+// `onThink(delta)` reçoit le texte de raisonnement (extended thinking d'Anthropic,
+// reasoning_content de DeepSeek/o-series) pour l'afficher séparément.
 
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+import { PROVIDERS, baseUrlFor, modelFor, keyFor } from "./models.js";
+
 const MAX_TOKENS = 4096;
+const THINKING_BUDGET = 6000;
 
 // Lecteur SSE générique : renvoie les charges utiles des lignes "data:".
 async function* sseData(response) {
@@ -39,29 +43,36 @@ async function ensureOk(response) {
 }
 
 // ---------------------------------------------------------------------------
-// Anthropic (Claude)
+// Anthropic (Claude) — API native, + extended thinking + web search serveur
 // ---------------------------------------------------------------------------
-function anthropicProvider({ apiKey, model }) {
+function anthropicProvider({ apiKey, model, baseUrl, thinking, webSearch }) {
+  const url = baseUrl.replace(/\/$/, "") + "/messages";
   return {
     id: "anthropic",
 
-    async runTurn({ system, history, tools, onText, signal }) {
+    async runTurn({ system, history, tools, onText, onThink, signal }) {
+      const useThinking = !!thinking;
       const body = {
         model,
-        max_tokens: MAX_TOKENS,
+        max_tokens: useThinking ? MAX_TOKENS + THINKING_BUDGET : MAX_TOKENS,
         system,
         messages: history,
         stream: true,
       };
-      if (tools && tools.length) {
-        body.tools = tools.map((t) => ({
-          name: t.name,
-          description: t.description,
-          input_schema: t.input_schema,
-        }));
+      if (useThinking) {
+        body.thinking = { type: "enabled", budget_tokens: THINKING_BUDGET };
       }
+      const toolList = [];
+      if (tools && tools.length) {
+        for (const t of tools)
+          toolList.push({ name: t.name, description: t.description, input_schema: t.input_schema });
+      }
+      if (webSearch) {
+        toolList.push({ type: "web_search_20250305", name: "web_search", max_uses: 5 });
+      }
+      if (toolList.length) body.tools = toolList;
 
-      const response = await fetch(ANTHROPIC_URL, {
+      const response = await fetch(url, {
         method: "POST",
         signal,
         headers: {
@@ -93,12 +104,18 @@ function anthropicProvider({ apiKey, model }) {
           case "content_block_delta": {
             const b = blocks[ev.index];
             if (!b) break;
-            if (ev.delta.type === "text_delta") {
-              b.text = (b.text || "") + ev.delta.text;
-              text += ev.delta.text;
-              onText && onText(ev.delta.text);
-            } else if (ev.delta.type === "input_json_delta") {
-              b._partial += ev.delta.partial_json;
+            const d = ev.delta;
+            if (d.type === "text_delta") {
+              b.text = (b.text || "") + d.text;
+              text += d.text;
+              onText && onText(d.text);
+            } else if (d.type === "thinking_delta") {
+              b.thinking = (b.thinking || "") + d.thinking;
+              onThink && onThink(d.thinking);
+            } else if (d.type === "signature_delta") {
+              b.signature = (b.signature || "") + d.signature;
+            } else if (d.type === "input_json_delta") {
+              b._partial += d.partial_json;
             }
             break;
           }
@@ -120,10 +137,16 @@ function anthropicProvider({ apiKey, model }) {
         }
       }
 
+      // On conserve TOUS les blocs (y compris thinking avec signature, requis
+      // par l'API au tour suivant) pour rester valide.
       const content = blocks.filter(Boolean).map((b) => {
         if (b.type === "tool_use")
           return { type: "tool_use", id: b.id, name: b.name, input: b.input || {} };
         if (b.type === "text") return { type: "text", text: b.text || "" };
+        if (b.type === "thinking")
+          return { type: "thinking", thinking: b.thinking || "", signature: b.signature || "" };
+        if (b.type === "redacted_thinking")
+          return { type: "redacted_thinking", data: b.data };
         return b;
       });
 
@@ -131,12 +154,7 @@ function anthropicProvider({ apiKey, model }) {
         .filter((b) => b.type === "tool_use")
         .map((b) => ({ id: b.id, name: b.name, input: b.input }));
 
-      return {
-        message: { role: "assistant", content },
-        toolCalls,
-        stopReason,
-        text,
-      };
+      return { message: { role: "assistant", content }, toolCalls, stopReason, text };
     },
 
     formatToolResults(results) {
@@ -154,42 +172,41 @@ function anthropicProvider({ apiKey, model }) {
 }
 
 // ---------------------------------------------------------------------------
-// OpenRouter (format OpenAI)
+// Générique compatible OpenAI (OpenAI, OpenRouter, Gemini, Mistral, Groq,
+// DeepSeek, Ollama, LM Studio, serveur perso…)
 // ---------------------------------------------------------------------------
-function openrouterProvider({ apiKey, model }) {
-  return {
-    id: "openrouter",
+function openaiProvider({ apiKey, model, baseUrl }) {
+  const url = baseUrl.replace(/\/$/, "") + "/chat/completions";
+  const headers = { "content-type": "application/json" };
+  if (apiKey) headers.authorization = `Bearer ${apiKey}`;
+  // Entêtes de courtoisie OpenRouter (ignorées ailleurs).
+  headers["HTTP-Referer"] = "https://github.com/FlorianMartins/firefox-ai-sidebar";
+  headers["X-Title"] = "AI Sidebar";
 
-    async runTurn({ system, history, tools, onText, signal }) {
+  return {
+    id: "openai",
+
+    async runTurn({ system, history, tools, onText, onThink, signal }) {
       const messages = system ? [{ role: "system", content: system }, ...history] : [...history];
       const body = { model, messages, stream: true };
       if (tools && tools.length) {
         body.tools = tools.map((t) => ({
           type: "function",
-          function: {
-            name: t.name,
-            description: t.description,
-            parameters: t.input_schema,
-          },
+          function: { name: t.name, description: t.description, parameters: t.input_schema },
         }));
       }
 
-      const response = await fetch(OPENROUTER_URL, {
+      const response = await fetch(url, {
         method: "POST",
         signal,
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${apiKey}`,
-          "HTTP-Referer": "https://github.com/FlorianMartins/firefox-ai-sidebar",
-          "X-Title": "AI Sidebar",
-        },
+        headers,
         body: JSON.stringify(body),
       });
       await ensureOk(response);
 
       let text = "";
       let finishReason = null;
-      const toolAcc = {}; // index -> { id, name, args }
+      const toolAcc = {};
 
       for await (const data of sseData(response)) {
         if (data === "[DONE]") break;
@@ -202,6 +219,9 @@ function openrouterProvider({ apiKey, model }) {
         const choice = chunk.choices && chunk.choices[0];
         if (!choice) continue;
         const delta = choice.delta || {};
+        // Raisonnement (DeepSeek: reasoning_content ; OpenRouter: reasoning)
+        const reason = delta.reasoning_content || delta.reasoning;
+        if (reason) onThink && onThink(reason);
         if (delta.content) {
           text += delta.content;
           onText && onText(delta.content);
@@ -244,7 +264,6 @@ function openrouterProvider({ apiKey, model }) {
     },
 
     formatToolResults(results) {
-      // OpenAI veut un message par résultat (role:"tool").
       return results.map((r) => ({
         role: "tool",
         tool_call_id: r.id,
@@ -254,15 +273,81 @@ function openrouterProvider({ apiKey, model }) {
   };
 }
 
-export function makeProvider(settings) {
-  if (settings.provider === "openrouter") {
-    return openrouterProvider({
-      apiKey: settings.openrouterKey,
-      model: settings.openrouterModel,
+// Fabrique le provider pour la conversation courante.
+export function makeProvider(settings, opts = {}) {
+  const id = settings.provider;
+  const meta = PROVIDERS[id] || PROVIDERS.anthropic;
+  const apiKey = keyFor(id, settings);
+  const model = modelFor(id, settings);
+  const baseUrl = baseUrlFor(id, settings);
+
+  if (meta.kind === "anthropic") {
+    return anthropicProvider({
+      apiKey,
+      model,
+      baseUrl,
+      thinking: !!opts.thinking && meta.supportsThinking,
+      webSearch: !!opts.webSearch && meta.supportsWebSearch,
     });
   }
-  return anthropicProvider({
-    apiKey: settings.anthropicKey,
-    model: settings.anthropicModel,
+  return openaiProvider({ apiKey, model, baseUrl });
+}
+
+// -------- Listing dynamique des modèles (format OpenAI /models) -------------
+export async function listModels(providerId, settings) {
+  const meta = PROVIDERS[providerId];
+  if (!meta) throw new Error("Fournisseur inconnu");
+  const baseUrl = baseUrlFor(providerId, settings);
+  if (!baseUrl) throw new Error("Base URL manquante.");
+  const apiKey = keyFor(providerId, settings);
+  const headers = {};
+  if (apiKey) headers.authorization = `Bearer ${apiKey}`;
+  const res = await fetch(baseUrl.replace(/\/$/, "") + "/models", { headers });
+  await ensureOk(res);
+  const json = await res.json();
+  const data = json.data || json.models || [];
+  return data
+    .map((m) => m.id || m.name)
+    .filter(Boolean)
+    .sort();
+}
+
+// -------- Génération d'images (compatible OpenAI /images/generations) -------
+// Renvoie une liste d'URL data: (ou http) à afficher.
+export async function generateImage(settings, { prompt, size = "1024x1024", signal }) {
+  const providerId = settings.imageProvider || "openai";
+  const meta = PROVIDERS[providerId];
+  if (!meta || !meta.supportsImages) {
+    throw new Error(
+      `Le fournisseur d'images « ${providerId} » n'est pas supporté. Choisissez OpenAI dans les réglages.`
+    );
+  }
+  const baseUrl = baseUrlFor(providerId, settings);
+  const apiKey = keyFor(providerId, settings);
+  if (meta.needsKey && !apiKey) throw new Error(`Clé API manquante pour ${meta.label}.`);
+
+  const body = {
+    model: settings.imageModel || (meta.imageModels && meta.imageModels[0][0]),
+    prompt,
+    n: 1,
+    size,
+  };
+  const headers = { "content-type": "application/json" };
+  if (apiKey) headers.authorization = `Bearer ${apiKey}`;
+
+  const res = await fetch(baseUrl.replace(/\/$/, "") + "/images/generations", {
+    method: "POST",
+    signal,
+    headers,
+    body: JSON.stringify(body),
   });
+  await ensureOk(res);
+  const json = await res.json();
+  const out = [];
+  for (const item of json.data || []) {
+    if (item.b64_json) out.push(`data:image/png;base64,${item.b64_json}`);
+    else if (item.url) out.push(item.url);
+  }
+  if (!out.length) throw new Error("Aucune image renvoyée par l'API.");
+  return out;
 }

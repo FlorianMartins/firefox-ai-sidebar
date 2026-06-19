@@ -7,24 +7,43 @@
     <link rel="stylesheet" href="../src/sidebar/sidebar.css" />
     <title>AI Sidebar — démo de rendu</title>
     <style>
-      /* Largeur type sidebar pour la capture */
       html, body { height: 100%; }
     </style>
   </head>
   <body>
     <header class="topbar">
       <div class="row">
-        <select><option>Claude</option></select>
+        <select>
+          <option>Claude (Anthropic)</option>
+          <option>OpenAI</option>
+          <option>Ollama (local)</option>
+        </select>
         <select><option>Claude Opus 4.8</option></select>
+        <button class="icon">⟳</button>
       </div>
       <div class="row">
+        <label class="toggle"><input type="checkbox" checked /> <span>💭</span></label>
+        <label class="toggle"><input type="checkbox" /> <span>🌐</span></label>
         <label class="toggle"><input type="checkbox" /> <span>Agent</span></label>
-        <label class="toggle"><input type="checkbox" checked /> <span>📄</span></label>
-        <button>＋</button><button>⚙</button>
+        <label class="toggle"><input type="checkbox" checked /> <span>👁</span></label>
+        <button class="icon">＋</button><button class="icon">⚙</button>
       </div>
     </header>
 
+    <div class="pagebar">
+      <span class="eye">👁</span>
+      <span class="page-title">OAuth 2.0 — RFC 6749 (datatracker.ietf.org)</span>
+    </div>
+
     <main id="messages" class="messages"></main>
+
+    <div class="quickbar">
+      <button class="quick">📝 Résumer</button>
+      <button class="quick">🌐 Traduire</button>
+      <button class="quick">✨ Améliorer</button>
+      <button class="quick">🔍 Rechercher</button>
+      <button class="quick">🎨 Image</button>
+    </div>
 
     <footer class="composer">
       <textarea rows="2" placeholder="Écrivez un message…">Explique-moi le flux OAuth 2.0 avec un schéma</textarea>
@@ -35,7 +54,6 @@
     <script src="../vendor/marked.min.js"></script>
     <script src="../vendor/purify.min.js"></script>
     <script type="module">
-      // Stub minimal de l'API extension pour charger mermaid via fetch http
       window.browser = {
         runtime: { getURL: (p) => new URL("../" + p, location.href).href },
       };
@@ -53,6 +71,13 @@
         else d.innerHTML = html;
         messages.appendChild(d);
         return d;
+      }
+      function addThink(text) {
+        const d = document.createElement("details");
+        d.className = "think"; d.open = true;
+        d.innerHTML = '<summary>💭 Réflexion</summary><div class="think-body"></div>';
+        d.querySelector(".think-body").textContent = text;
+        messages.appendChild(d);
       }
 
       const sample = [
@@ -77,15 +102,6 @@
         "  S-->>A: access_token",
         "```",
         "",
-        "Échange du code côté serveur :",
-        "",
-        "```js",
-        'const res = await fetch("/token", {',
-        '  method: "POST",',
-        "  body: new URLSearchParams({ grant_type: \"authorization_code\", code }),",
-        "});",
-        "```",
-        "",
         "Et un bouton de connexion :",
         "",
         "```html",
@@ -95,21 +111,13 @@
 
       configureMarkdown();
       addMsg("user", "Explique-moi le flux OAuth 2.0 avec un schéma");
+      addThink("La page ouverte est la RFC 6749. L'utilisateur veut le flux Authorization Code. Je vais l'expliquer pas à pas, puis fournir un diagramme de séquence mermaid et un bouton d'exemple.");
       const a = addMsg("assistant", renderMarkdown(sample));
       enhanceArtifacts(a);
 
-      // Affiche automatiquement l'aperçu HTML (pour la capture)
       setTimeout(() => {
         for (const b of a.querySelectorAll(".code-btn")) {
           if (b.textContent === "Aperçu") b.click();
-        }
-        // Option ?focus=html : faire défiler jusqu'à l'aperçu HTML rendu
-        if (location.search.includes("focus=html")) {
-          setTimeout(() => {
-            const frames = a.querySelectorAll(".artifact-frame");
-            const last = frames[frames.length - 1];
-            if (last) last.scrollIntoView({ block: "center" });
-          }, 900);
         }
         document.body.dataset.ready = "1";
       }, 1200);

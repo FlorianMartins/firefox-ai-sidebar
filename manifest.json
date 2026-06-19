@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "AI Sidebar — Claude & OpenRouter",
-  "version": "0.1.0",
-  "description": "Une sidebar IA qui discute avec Claude et OpenRouter, lit la page et les onglets, et agit dans le navigateur (mode agent). BYOK : vos clés API restent locales.",
+  "name": "AI Sidebar — IA multi-fournisseurs",
+  "version": "0.2.0",
+  "description": "Sidebar IA open-source type Sider : branchez votre propre IA (Claude, OpenAI, Gemini, Mistral, Groq, DeepSeek, OpenRouter, Ollama/LM Studio local). Lit la page, résume, traduit, améliore, génère des images, mode agent. 100% BYOK.",
   "author": "Florian Martins",
   "browser_specific_settings": {
     "gecko": {
@@ -24,7 +24,12 @@
   ],
   "host_permissions": [
     "https://api.anthropic.com/*",
+    "https://api.openai.com/*",
     "https://openrouter.ai/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.mistral.ai/*",
+    "https://api.groq.com/*",
+    "https://api.deepseek.com/*",
     "<all_urls>"
   ],
   "background": {

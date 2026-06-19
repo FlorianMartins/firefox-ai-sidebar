@@ -3,14 +3,19 @@
 
 import { executeTool, TOOLS } from "./tools.js";
 
-export function buildSystemPrompt({ agentMode }) {
+export function buildSystemPrompt({ agentMode, targetLang }) {
   let p =
-    "Tu es un assistant intégré en sidebar dans le navigateur Firefox de l'utilisateur. " +
-    "Tu réponds de façon concise et utile, en français par défaut (ou dans la langue de l'utilisateur). " +
-    "Tu peux recevoir le contenu de la page consultée comme contexte.\n\n" +
+    "Tu es un assistant intégré en sidebar dans le navigateur Firefox de l'utilisateur, " +
+    "à la manière de Sider. Tu as des « yeux » : le contenu de la page consultée peut t'être " +
+    "fourni automatiquement comme contexte — appuie-toi dessus pour répondre (résumer, " +
+    "traduire, expliquer, comparer). Réponds de façon concise et utile, en français par défaut " +
+    "(ou dans la langue de l'utilisateur).\n\n" +
     "Formate tes réponses en Markdown. Pour les blocs de code, précise toujours le langage. " +
     "Pour un diagramme, utilise un bloc ```mermaid (il sera rendu visuellement). " +
     "Pour une maquette ou un composant web, utilise un bloc ```html ou ```svg (un bouton « Aperçu » l'affichera).";
+  if (targetLang) {
+    p += `\n\nLangue cible préférée pour les traductions : ${targetLang}.`;
+  }
   if (agentMode) {
     p +=
       "\n\nMODE AGENT ACTIF. Tu disposes d'outils pour lire et agir dans le navigateur " +
@@ -34,6 +39,7 @@ export async function runConversation({
   history,
   tools,
   onText,
+  onThink,
   onToolStart,
   onToolEnd,
   confirmActions,
@@ -42,7 +48,7 @@ export async function runConversation({
   maxSteps = 8,
 }) {
   for (let step = 0; step < maxSteps; step++) {
-    const turn = await provider.runTurn({ system, history, tools, onText, signal });
+    const turn = await provider.runTurn({ system, history, tools, onText, onThink, signal });
     history.push(turn.message);
 
     if (!turn.toolCalls.length || turn.stopReason !== "tool_use") {

@@ -10,32 +10,37 @@
     <main>
       <h1>AI Sidebar — Réglages</h1>
       <p class="muted">
-        Vos clés API sont stockées <b>localement</b> dans ce navigateur
-        (<code>storage.local</code>) et ne sont envoyées qu'aux API que vous
-        choisissez (Anthropic / OpenRouter). Aucune autre transmission.
+        100% <b>BYOK</b> : vos clés sont stockées <b>localement</b> dans ce
+        navigateur (<code>storage.local</code>), jamais synchronisées, et envoyées
+        uniquement à l'API que vous choisissez. Aucune clé n'est fournie par
+        l'extension — renseignez la vôtre, ou pointez un modèle local sans clé.
       </p>
 
+      <h2>Fournisseurs d'IA</h2>
+      <div id="providers"></div>
+
       <section>
-        <h2>Claude (Anthropic)</h2>
-        <label>Clé API
-          <input type="password" id="anthropicKey" placeholder="sk-ant-..." />
+        <h2>Génération d'images</h2>
+        <label>Fournisseur d'images
+          <select id="imageProvider"></select>
         </label>
-        <p class="muted">Console : <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></p>
+        <label>Modèle d'image
+          <input type="text" id="imageModel" placeholder="gpt-image-1" />
+        </label>
+        <p class="muted">Utilise l'endpoint compatible OpenAI <code>/images/generations</code>.</p>
       </section>
 
       <section>
-        <h2>OpenRouter</h2>
-        <label>Clé API
-          <input type="password" id="openrouterKey" placeholder="sk-or-..." />
-        </label>
-        <p class="muted">Clés : <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a></p>
-      </section>
-
-      <section>
-        <h2>Mode agent &amp; contexte</h2>
+        <h2>Comportement</h2>
+        <label class="check"><input type="checkbox" id="thinking" /> Afficher le raisonnement du modèle (thinking)</label>
+        <label class="check"><input type="checkbox" id="webSearch" /> Recherche web (Claude uniquement)</label>
         <label class="check"><input type="checkbox" id="agentMode" /> Activer le mode agent par défaut</label>
-        <label class="check"><input type="checkbox" id="confirmActions" /> Demander confirmation avant chaque action (clic, saisie, navigation…)</label>
-        <label class="check"><input type="checkbox" id="includePageContext" /> Injecter le contenu de la page active (mode chat)</label>
+        <label class="check"><input type="checkbox" id="confirmActions" /> Demander confirmation avant chaque action (clic, saisie…)</label>
+        <label class="check"><input type="checkbox" id="includePageContext" /> L'IA voit la page consultée (injection auto en mode chat)</label>
+        <label class="check"><input type="checkbox" id="autoReadPage" /> Relire la page à chaque navigation (y compris sous-domaine)</label>
+        <label>Langue cible des traductions
+          <input type="text" id="targetLang" placeholder="Français" />
+        </label>
         <label>Taille max du contexte de page (caractères)
           <input type="number" id="maxPageChars" min="1000" max="100000" step="1000" />
         </label>

@@ -27,10 +27,22 @@
     return txt.replace(/\s+/g, " ").slice(0, 120);
   }
 
+  function metaDescription() {
+    const m =
+      document.querySelector('meta[name="description"]') ||
+      document.querySelector('meta[property="og:description"]');
+    return (m && m.getAttribute("content")) || "";
+  }
+
   function readPage() {
     const main = document.querySelector("main, article, [role=main]") || document.body;
     const text = (main.innerText || "").replace(/\n{3,}/g, "\n\n").slice(0, 20000);
-    return { title: document.title, url: location.href, text };
+    return {
+      title: document.title,
+      url: location.href,
+      description: metaDescription(),
+      text,
+    };
   }
 
   function readSelection() {
@@ -126,4 +138,26 @@
     }
     return false;
   });
+
+  // Notifie la sidebar des changements d'URL côté SPA (pushState / popstate),
+  // qui ne déclenchent pas toujours tabs.onUpdated. Les navigations classiques
+  // (nouveau site, sous-domaine) sont, elles, captées par la sidebar via les
+  // événements d'onglet.
+  let lastUrl = location.href;
+  const notifyNav = () => {
+    if (location.href === lastUrl) return;
+    lastUrl = location.href;
+    try {
+      browser.runtime.sendMessage({ type: "page_changed", url: location.href });
+    } catch (_) {}
+  };
+  for (const m of ["pushState", "replaceState"]) {
+    const orig = history[m];
+    history[m] = function () {
+      const r = orig.apply(this, arguments);
+      setTimeout(notifyNav, 50);
+      return r;
+    };
+  }
+  window.addEventListener("popstate", () => setTimeout(notifyNav, 50));
 })();

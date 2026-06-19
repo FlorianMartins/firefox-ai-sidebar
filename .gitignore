@@ -1,5 +1,8 @@
 node_modules/
 web-ext-artifacts/
+.web-ext-artifacts/
+.build/
+.build-artifacts/
 *.zip
 *.xpi
 .DS_Store

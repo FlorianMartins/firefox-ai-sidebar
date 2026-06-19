@@ -9,33 +9,45 @@
   <body>
     <header class="topbar">
       <div class="row">
-        <select id="provider" title="Fournisseur">
-          <option value="anthropic">Claude</option>
-          <option value="openrouter">OpenRouter</option>
-        </select>
+        <select id="provider" title="Fournisseur"></select>
         <select id="model" title="Modèle"></select>
+        <button id="refreshModels" class="icon" title="Rafraîchir la liste des modèles">⟳</button>
       </div>
       <div class="row">
+        <label class="toggle" title="Afficher le raisonnement du modèle">
+          <input type="checkbox" id="thinking" />
+          <span>💭</span>
+        </label>
+        <label class="toggle" title="Recherche web (Claude)">
+          <input type="checkbox" id="webSearch" />
+          <span>🌐</span>
+        </label>
         <label class="toggle" title="Le modèle peut agir dans le navigateur">
           <input type="checkbox" id="agentMode" />
           <span>Agent</span>
         </label>
-        <label class="toggle" title="Injecter le contenu de la page active">
+        <label class="toggle" title="L'IA voit la page consultée">
           <input type="checkbox" id="pageCtx" />
-          <span>📄</span>
+          <span>👁</span>
         </label>
-        <button id="newChat" title="Nouvelle conversation">＋</button>
-        <button id="openOptions" title="Réglages">⚙</button>
+        <button id="newChat" class="icon" title="Nouvelle conversation">＋</button>
+        <button id="openOptions" class="icon" title="Réglages">⚙</button>
       </div>
     </header>
 
+    <div id="pageBar" class="pagebar hidden" title="Page vue par l'IA">
+      <span class="eye">👁</span>
+      <span id="pageTitle" class="page-title"></span>
+    </div>
+
     <main id="messages" class="messages">
       <div class="empty" id="empty">
-        <p>Sidebar IA — Claude &amp; OpenRouter.</p>
+        <p><b>Sidebar IA</b> — branchez votre propre IA.</p>
         <p class="muted">
-          Renseignez votre clé API dans <a href="#" id="emptyOptions">⚙ Réglages</a>,
-          puis posez une question. Activez <b>Agent</b> pour laisser l'IA interagir
-          avec la page et les onglets.
+          Claude, OpenAI, Gemini, Mistral, Groq, DeepSeek, OpenRouter, ou un modèle
+          <b>local</b> (Ollama / LM Studio). Renseignez votre clé dans
+          <a href="#" id="emptyOptions">⚙ Réglages</a>, puis posez une question ou
+          utilisez les actions rapides ci-dessous.
         </p>
       </div>
     </main>
@@ -46,6 +58,14 @@
         <button id="confirmAllow" class="ok">Autoriser</button>
         <button id="confirmDeny" class="no">Refuser</button>
       </div>
+    </div>
+
+    <div class="quickbar" id="quickbar">
+      <button class="quick" data-action="summarize" title="Résumer la page">📝 Résumer</button>
+      <button class="quick" data-action="translate" title="Traduire la page ou la sélection">🌐 Traduire</button>
+      <button class="quick" data-action="improve" title="Améliorer le texte sélectionné">✨ Améliorer</button>
+      <button class="quick" data-action="research" title="Rechercher des infos">🔍 Rechercher</button>
+      <button class="quick" data-action="image" title="Générer une image">🎨 Image</button>
     </div>
 
     <footer class="composer">
