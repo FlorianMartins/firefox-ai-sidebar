@@ -55,6 +55,12 @@ const els = {
   improvePreset: $("improvePreset"),
   imageSize: $("imageSize"),
   imageProviderNote: $("imageProviderNote"),
+  siteView: $("siteView"),
+  siteProvider: $("siteProvider"),
+  siteFrame: $("siteFrame"),
+  siteInsertPage: $("siteInsertPage"),
+  siteInsertSel: $("siteInsertSel"),
+  siteReload: $("siteReload"),
   confirmBar: $("confirmBar"),
   confirmText: $("confirmText"),
   confirmAllow: $("confirmAllow"),
@@ -82,11 +88,26 @@ const PLACEHOLDERS = {
   terminal: "Demandez du code, une commande, un script…",
 };
 
+// "Account / site" mode: the provider's own chat website, used with the user's
+// account/subscription (like Firefox's native AI sidebar).
+const SITE_PROVIDERS = [
+  ["chatgpt", "ChatGPT (OpenAI)", "https://chatgpt.com/"],
+  ["claude", "Claude (Anthropic)", "https://claude.ai/new"],
+  ["gemini", "Gemini (Google)", "https://gemini.google.com/app"],
+  ["mistral", "Le Chat (Mistral)", "https://chat.mistral.ai/chat"],
+  ["copilot", "Copilot (Microsoft)", "https://copilot.microsoft.com/"],
+  ["perplexity", "Perplexity", "https://www.perplexity.ai/"],
+  ["grok", "Grok (xAI)", "https://grok.com/"],
+  ["deepseek", "DeepSeek", "https://chat.deepseek.com/"],
+  ["huggingchat", "HuggingChat", "https://huggingface.co/chat/"],
+];
+
 async function init() {
   configureMarkdown();
   settings = await getSettings();
   populateModelSelector();
   populateImprovePresets();
+  populateSiteProviders();
   els.thinking.checked = settings.thinking;
   els.webSearch.checked = settings.webSearch;
   els.agentMode.checked = settings.agentMode;
@@ -234,7 +255,47 @@ function setMode(next) {
   els.improveControls.classList.toggle("hidden", next !== "improve");
   els.imageControls.classList.toggle("hidden", next !== "image");
   document.body.classList.toggle("mode-terminal", next === "terminal");
+  document.body.classList.toggle("mode-site", next === "account");
+  if (next === "account") loadSite();
   els.input.placeholder = PLACEHOLDERS[next] || PLACEHOLDERS.chat;
+}
+
+// ----- Account / site mode --------------------------------------------------
+function populateSiteProviders() {
+  els.siteProvider.innerHTML = "";
+  for (const [id, label] of SITE_PROVIDERS) {
+    const o = document.createElement("option");
+    o.value = id;
+    o.textContent = label;
+    els.siteProvider.appendChild(o);
+  }
+  const chosen = SITE_PROVIDERS.some((s) => s[0] === settings.siteProvider) ? settings.siteProvider : SITE_PROVIDERS[0][0];
+  els.siteProvider.value = chosen;
+}
+function siteUrl(id) {
+  const p = SITE_PROVIDERS.find((s) => s[0] === id);
+  return p ? p[2] : SITE_PROVIDERS[0][2];
+}
+function loadSite(force) {
+  const url = siteUrl(els.siteProvider.value);
+  if (force || els.siteFrame.dataset.url !== url) {
+    els.siteFrame.dataset.url = url;
+    els.siteFrame.src = url; // (re)load only when the provider actually changes
+  }
+}
+function insertIntoSite(text) {
+  try {
+    els.siteFrame.contentWindow.postMessage({ __aiSiteInsert: true, text }, "*");
+  } catch (_) {}
+}
+async function siteInsertPage() {
+  const p = await executeTool("read_page", {}, {});
+  if (!p || p.error || !p.text) return addMessage("error", "Page illisible.");
+  insertIntoSite(`Contenu de la page « ${p.title || ""} » (${p.url}) :\n\n${(p.text || "").slice(0, settings.maxPageChars)}\n\n`);
+}
+async function siteInsertSelection() {
+  const sel = await getSelection();
+  if (sel) insertIntoSite(sel + "\n\n");
 }
 
 // ----- Page awareness -------------------------------------------------------
@@ -474,6 +535,15 @@ function wire() {
   els.newChat.addEventListener("click", newChat);
   els.openOptions.addEventListener("click", () => browser.runtime.openOptionsPage());
   els.modelConnect.addEventListener("click", () => browser.runtime.openOptionsPage());
+
+  els.siteProvider.addEventListener("change", async () => {
+    settings.siteProvider = els.siteProvider.value;
+    await setSettings({ siteProvider: settings.siteProvider });
+    loadSite(true);
+  });
+  els.siteInsertPage.addEventListener("click", siteInsertPage);
+  els.siteInsertSel.addEventListener("click", siteInsertSelection);
+  els.siteReload.addEventListener("click", () => loadSite(true));
 
   onSettingsChanged(async () => {
     settings = await getSettings();

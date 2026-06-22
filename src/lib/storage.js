@@ -22,7 +22,8 @@ const DEFAULTS = {
   imageSize: "1024x1024",
 
   // ----- UI / behaviour ------------------------------------------------------
-  mode: "chat", // active workspace tab: chat | translate | improve | image
+  mode: "chat", // active workspace tab: chat | translate | improve | image | terminal | account
+  siteProvider: "chatgpt", // provider site for the embedded "account" mode
   thinking: false, // surface the model's reasoning (supported models only)
   webSearch: false, // server-side web search (Anthropic)
   agentMode: false, // allow the model to act inside the browser

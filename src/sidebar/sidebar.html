@@ -27,7 +27,19 @@
       <button class="mode" data-mode="improve">✨ Améliorer</button>
       <button class="mode" data-mode="image">🎨 Image</button>
       <button class="mode" data-mode="terminal">⌨ Terminal</button>
+      <button class="mode" data-mode="account">👤 Compte</button>
     </nav>
+
+    <!-- Account / site mode: the provider's own chat website, embedded -->
+    <div id="siteView" class="siteview hidden">
+      <div class="site-toolbar">
+        <select id="siteProvider" title="Service IA"></select>
+        <button id="siteInsertPage" class="chip-btn" title="Insérer le contenu de l'onglet actif">📄 Page</button>
+        <button id="siteInsertSel" class="chip-btn" title="Insérer la sélection">✂ Sélection</button>
+        <button id="siteReload" class="icon" title="Recharger">⟳</button>
+      </div>
+      <iframe id="siteFrame" class="site-frame" referrerpolicy="no-referrer"></iframe>
+    </div>
 
     <!-- History panel -->
     <div id="historyPanel" class="panel hidden">
