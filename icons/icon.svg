@@ -1,17 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#6366f1"/>
-      <stop offset="0.55" stop-color="#8b5cf6"/>
-      <stop offset="1" stop-color="#a855f7"/>
+    <linearGradient id="g" x1="14" y1="8" x2="82" y2="88" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5b8bff"/>
+      <stop offset="0.5" stop-color="#8b5cf6"/>
+      <stop offset="1" stop-color="#d946ef"/>
     </linearGradient>
   </defs>
-  <rect width="96" height="96" rx="22" fill="url(#g)"/>
-  <!-- Abstract "signal / AI ripple": a dot emitting concentric arcs -->
-  <g fill="none" stroke="#ffffff" stroke-linecap="round">
-    <circle cx="34" cy="48" r="5.5" fill="#ffffff" stroke="none"/>
-    <path d="M42 36.5 A 14 14 0 0 1 42 59.5" stroke-width="4.5" opacity="0.95"/>
-    <path d="M46.6 30 A 22 22 0 0 1 46.6 66" stroke-width="4.5" opacity="0.65"/>
-    <path d="M51.2 23.4 A 30 30 0 0 1 51.2 72.6" stroke-width="4.5" opacity="0.38"/>
-  </g>
+  <!-- Modern 4-point spark: transparent background, gradient mark only. -->
+  <path fill="url(#g)" d="M48 8 C 52 36 60 44 88 48 C 60 52 52 60 48 88 C 44 60 36 52 8 48 C 36 44 44 36 48 8 Z"/>
 </svg>

@@ -77,6 +77,23 @@
       </div>
     </main>
 
+    <!-- Dedicated Terminal workspace (OpenClaude): a real terminal-style pane that
+         fills the sidebar, boots a `claude` session and keeps history locally. -->
+    <section id="terminalView" class="terminal hidden">
+      <div class="term-head">
+        <span class="term-dot r"></span><span class="term-dot y"></span><span class="term-dot g"></span>
+        <span class="term-title">OpenClaude — terminal</span>
+        <select id="termModel" class="term-model" title="Modèle utilisé par le terminal"></select>
+        <button id="termClear" class="term-btn" title="Effacer le terminal">clear</button>
+      </div>
+      <div id="termLog" class="term-log" aria-live="polite"></div>
+      <div class="term-inputline">
+        <span class="term-prompt">claude&gt;</span>
+        <textarea id="termInput" rows="1" class="term-input" spellcheck="false"
+          placeholder="décris une tâche de code…  ('help', 'clear', ↑/↓ historique)"></textarea>
+      </div>
+    </section>
+
     <div id="confirmBar" class="confirm hidden">
       <span id="confirmText"></span>
       <div class="confirm-actions">

@@ -287,28 +287,62 @@ button { cursor: pointer; }
 /* ----- Generated image ----- */
 .gen-image { max-width: 100%; border-radius: 10px; display: block; margin: 4px 0; }
 
-/* ----- Terminal / dev mode look ----- */
-body.mode-terminal .messages { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
-body.mode-terminal .msg.user,
-body.mode-terminal .msg.assistant { align-self: stretch; max-width: 100%; }
-body.mode-terminal .msg.user {
-  background: #0c0e14; color: #cdd3e1; border: 1px solid var(--border); border-radius: 8px;
+/* ----- Dedicated Terminal workspace (OpenClaude) ----- */
+/* In terminal mode the chat UI is hidden and the terminal pane fills the sidebar. */
+body.mode-terminal #messages,
+body.mode-terminal #controls,
+body.mode-terminal .modelbar,
+body.mode-terminal .composer,
+body.mode-terminal #pageBar,
+body.mode-terminal #tabsPanel { display: none !important; }
+
+.terminal {
+  flex: 1; min-height: 0; display: flex; flex-direction: column;
+  background: #0a0c12;
+  font-family: ui-monospace, SFMono-Regular, Menlo, "Cascadia Code", monospace;
 }
-body.mode-terminal .msg.user::before { content: "$ "; color: #7ee787; font-weight: 700; }
-body.mode-terminal .msg.assistant { background: #0c0e14; border-color: #1c2233; }
-body.mode-terminal .composer textarea { font-family: ui-monospace, monospace; }
-/* Homogenise the response font in Terminal mode (one consistent monospace). */
-body.mode-terminal .msg.assistant,
-body.mode-terminal .msg.assistant p,
-body.mode-terminal .msg.assistant li,
-body.mode-terminal .msg.assistant a,
-body.mode-terminal .msg.assistant strong,
-body.mode-terminal .msg.assistant em,
-body.mode-terminal .msg.assistant td,
-body.mode-terminal .msg.assistant th { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
-body.mode-terminal .msg.assistant h1,
-body.mode-terminal .msg.assistant h2,
-body.mode-terminal .msg.assistant h3 { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; margin: 8px 0 4px; }
+.term-head {
+  display: flex; align-items: center; gap: 7px; padding: 7px 10px;
+  background: #0c0e15; border-bottom: 1px solid #1b2030;
+}
+.term-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+.term-dot.r { background: #ff5f56; } .term-dot.y { background: #ffbd2e; } .term-dot.g { background: #27c93f; }
+.term-title { font-size: 11.5px; color: #8b93a7; margin-left: 4px; }
+.term-model {
+  margin-left: auto; max-width: 150px; appearance: none; -webkit-appearance: none;
+  background: #11141d; border: 1px solid #232838; border-radius: 6px;
+  color: #cdd3e1; font-size: 11px; padding: 3px 7px; min-width: 0;
+}
+.term-btn {
+  background: #11141d; border: 1px solid #232838; border-radius: 6px;
+  color: #9aa0b4; font-size: 11px; padding: 3px 9px; flex: 0 0 auto;
+}
+.term-btn:hover { color: #e7e8ef; border-color: var(--accent); }
+.term-log {
+  flex: 1; min-height: 0; overflow-y: auto; padding: 10px 12px;
+  font-size: 12.5px; line-height: 1.5; color: #c9d1e3;
+}
+.term-line { white-space: pre-wrap; word-break: break-word; margin: 0 0 2px; }
+.term-line.banner { color: #7aa2ff; font-weight: 600; }
+.term-line.sys { color: #6b7280; }
+.term-line.term-err { color: #ff7b72; margin: 2px 0 9px; }
+.term-cmd { color: #e7e8ef; margin: 6px 0 1px; }
+.term-cmd .term-prompt { color: #27c93f; font-weight: 700; margin-right: 6px; }
+/* Markdown answer block rendered inside the terminal (monospace, dark). */
+.term-out { margin: 1px 0 12px; color: #cdd3e1; }
+.term-out > *:first-child { margin-top: 0; }
+.term-out p, .term-out li { margin: 4px 0; }
+.term-out h1, .term-out h2, .term-out h3 { font-size: 13px; margin: 9px 0 4px; color: #e7e8ef; }
+.term-inputline {
+  display: flex; align-items: flex-start; gap: 8px; padding: 9px 12px;
+  border-top: 1px solid #1b2030; background: #0c0e15;
+}
+.term-inputline .term-prompt { color: #27c93f; font-weight: 700; padding-top: 2px; flex: 0 0 auto; }
+.term-input {
+  flex: 1; resize: none; background: transparent; border: none; outline: none;
+  color: #e7e8ef; font-family: inherit; font-size: 12.5px; line-height: 1.5;
+  max-height: 120px; min-width: 0;
+}
 
 /* ----- Per-message compare bar (on the latest answer) ----- */
 .msg-actions {

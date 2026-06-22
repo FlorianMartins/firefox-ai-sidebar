@@ -48,6 +48,11 @@ const els = {
   send: $("send"),
   stop: $("stop"),
   modebar: $("modebar"),
+  terminalView: $("terminalView"),
+  termLog: $("termLog"),
+  termInput: $("termInput"),
+  termModel: $("termModel"),
+  termClear: $("termClear"),
   chatControls: $("chatControls"),
   translateControls: $("translateControls"),
   improveControls: $("improveControls"),
@@ -78,6 +83,10 @@ let mode = "chat";
 let lastUserContent = "";
 let lastRunMode = "chat";
 let lastForceWeb = false;
+
+// Terminal workspace (OpenClaude): its own native message history + persisted
+// scrollback, independent from the chat. `cmds`/`cmdIdx` drive ↑/↓ recall.
+const term = { native: [], lines: [], cmds: [], cmdIdx: 0, booted: false };
 
 const PLACEHOLDERS = {
   chat: "Écrivez un message…",
@@ -205,6 +214,7 @@ function populateModelSelector() {
     val = pid + "|" + modelFor(pid, settings);
   }
   fillModelSelect(els.modelSelect, val);
+  if (els.termModel) fillModelSelect(els.termModel, val);
   updateEmptyState();
 }
 
@@ -265,11 +275,11 @@ async function doFreeConnect() {
   els.freeConnect.textContent = "Connexion…";
   try {
     const key = await connectOpenRouter();
-    settings.keys = settings.keys || {};
-    settings.keys.openrouter = key;
-    await setNested("keys", "openrouter", key);
+    settings.keys = { ...(settings.keys || {}), openrouter: key };
     settings.provider = "openrouter";
-    await setSettings({ provider: "openrouter" });
+    // Atomic write of the full keys object + provider so the Settings page (which
+    // reads keys.openrouter) reliably shows the key it just received.
+    await setSettings({ keys: settings.keys, provider: "openrouter" });
     populateModelSelector();
     autoListConnected();
     addMessage("tool", "✓ Connecté à OpenRouter — choisissez un modèle gratuit ci-dessous.");
@@ -323,14 +333,139 @@ function setMode(next) {
   settings.mode = next;
   setSettings({ mode: next });
   els.modebar.querySelectorAll(".mode").forEach((b) => b.classList.toggle("active", b.dataset.mode === next));
-  // Chat-style toggles are also useful in the terminal/dev mode.
-  els.chatControls.classList.toggle("hidden", !(next === "chat" || next === "terminal"));
+  els.chatControls.classList.toggle("hidden", next !== "chat");
   els.translateControls.classList.toggle("hidden", next !== "translate");
   els.improveControls.classList.toggle("hidden", next !== "improve");
   els.imageControls.classList.toggle("hidden", next !== "image");
   document.body.classList.toggle("mode-terminal", next === "terminal");
+  els.terminalView.classList.toggle("hidden", next !== "terminal");
   els.input.placeholder = PLACEHOLDERS[next] || PLACEHOLDERS.chat;
+  if (next === "terminal") {
+    termBoot();
+    setTimeout(() => els.termInput.focus(), 0);
+  }
   updateEmptyState();
+}
+
+// ----- Terminal workspace (OpenClaude) --------------------------------------
+function termModelLabel() {
+  const sel = parseSel(els.termModel && els.termModel.value);
+  if (!sel.providerId) return "(aucun modèle — connectez un fournisseur)";
+  return sel.modelId;
+}
+// Append a line/block to the terminal scrollback. `kind`: banner | sys | cmd | out | err.
+function termAppend(kind, text) {
+  const div = document.createElement("div");
+  if (kind === "cmd") {
+    div.className = "term-cmd";
+    const p = document.createElement("span"); p.className = "term-prompt"; p.textContent = "claude>";
+    const t = document.createElement("span"); t.textContent = " " + text;
+    div.appendChild(p); div.appendChild(t);
+  } else if (kind === "out") {
+    div.className = "term-out";
+    div.innerHTML = renderMarkdown(text || "");
+    enhanceArtifacts(div);
+  } else if (kind === "err") {
+    div.className = "term-line term-err"; div.textContent = text;
+  } else if (kind === "banner") {
+    div.className = "term-line banner"; div.textContent = text;
+  } else {
+    div.className = "term-line sys"; div.textContent = text;
+  }
+  els.termLog.appendChild(div);
+  els.termLog.scrollTop = els.termLog.scrollHeight;
+  return div;
+}
+function termPrintBanner() {
+  termAppend("banner", "OpenClaude · agent de code en terminal (via OpenRouter & autres API)");
+  termAppend("sys", "$ claude");
+  termAppend("sys", "● Session démarrée — modèle : " + termModelLabel() + "  ·  historique local actif.");
+  termAppend("sys", "  Décris une tâche de code. 'help' pour l'aide, 'clear' pour effacer, ↑/↓ pour rappeler.");
+}
+// Boot once per page load: print banner, then replay any locally-saved session.
+function termBoot() {
+  if (term.booted) return;
+  term.booted = true;
+  termPrintBanner();
+  const s = settings.terminalSession;
+  if (s && Array.isArray(s.lines) && s.lines.length) {
+    term.native = Array.isArray(s.native) ? s.native : [];
+    for (const ln of s.lines) {
+      termAppend(ln.kind, ln.text);
+      term.lines.push(ln);
+      if (ln.kind === "cmd") term.cmds.push(ln.text);
+    }
+    term.cmdIdx = term.cmds.length;
+    termAppend("sys", "— session précédente restaurée —");
+  }
+}
+async function termPersist() {
+  await setSettings({ terminalSession: { lines: term.lines, native: term.native } });
+}
+function termClearAll() {
+  els.termLog.innerHTML = "";
+  term.lines = []; term.native = []; term.cmds = []; term.cmdIdx = 0;
+  termPrintBanner();
+  termPersist();
+}
+function autoGrowTerm() {
+  els.termInput.style.height = "auto";
+  els.termInput.style.height = Math.min(els.termInput.scrollHeight, 120) + "px";
+}
+async function termSend(rawText) {
+  const text = (rawText || "").trim();
+  if (!text || busy) return;
+  els.termInput.value = "";
+  autoGrowTerm();
+  const lower = text.toLowerCase();
+  if (lower === "clear" || lower === "cls") return termClearAll();
+  if (lower === "help") {
+    termAppend("sys",
+      "OpenClaude — tape une tâche de code (ex: « écris un script bash qui sauvegarde /etc »).\n" +
+      "  • le modèle répond façon agent CLI (commandes, diffs, statuts) ;\n" +
+      "  • il ne PEUT PAS exécuter sur ta machine — il fournit les commandes à lancer ;\n" +
+      "  • 'clear' efface · ↑/↓ rappellent tes commandes · Entrée envoie, Maj+Entrée = nouvelle ligne ;\n" +
+      "  • le modèle se choisit en haut à droite ; l'historique reste 100% local.");
+    return;
+  }
+  const sel = parseSel(els.termModel.value);
+  if (!sel.providerId || currentKeyMissing(sel.providerId)) {
+    termAppend("err", "✗ aucun modèle connecté — connecte un fournisseur (OpenRouter) puis choisis un modèle en haut à droite.");
+    return;
+  }
+  term.cmds.push(text); term.cmdIdx = term.cmds.length;
+  termAppend("cmd", text);
+  term.lines.push({ kind: "cmd", text });
+
+  startBusy();
+  term.native.push({ role: "user", content: text });
+  const provider = makeProvider(
+    { ...settings, provider: sel.providerId, models: { ...settings.models, [sel.providerId]: sel.modelId } },
+    { thinking: false, webSearch: false }
+  );
+  const system = buildSystemPrompt({
+    agentMode: false, targetLang: settings.targetLang, responseLang: settings.responseLang,
+    mode: "terminal", blockPayments: settings.blockPayments,
+  });
+  const out = termAppend("out", "");
+  let raw = "";
+  try {
+    await runConversation({
+      provider, system, history: term.native, tools: [],
+      onText: (d) => { raw += d; out.innerHTML = renderMarkdown(raw); els.termLog.scrollTop = els.termLog.scrollHeight; },
+      onThink: () => {},
+      signal: abortController.signal,
+    });
+    out.innerHTML = renderMarkdown(raw); enhanceArtifacts(out);
+    term.lines.push({ kind: "out", text: raw });
+  } catch (e) {
+    out.remove();
+    if (e && e.name === "AbortError") termAppend("err", "■ interrompu");
+    else termAppend("err", "✗ " + (e && e.message ? e.message : String(e)));
+  } finally {
+    endBusy();
+    await termPersist();
+  }
 }
 
 // ----- Page awareness -------------------------------------------------------
@@ -576,6 +711,35 @@ function wire() {
   els.input.addEventListener("input", autoGrow);
   els.stop.addEventListener("click", () => abortController && abortController.abort());
   els.newChat.addEventListener("click", newChat);
+
+  // Terminal workspace events (dedicated input line, model picker, clear).
+  els.termInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); termSend(els.termInput.value); return; }
+    if (e.key === "ArrowUp" && !e.shiftKey && term.cmds.length) {
+      e.preventDefault();
+      term.cmdIdx = Math.max(0, term.cmdIdx - 1);
+      els.termInput.value = term.cmds[term.cmdIdx] || "";
+      autoGrowTerm();
+    } else if (e.key === "ArrowDown" && !e.shiftKey && term.cmds.length) {
+      e.preventDefault();
+      term.cmdIdx = Math.min(term.cmds.length, term.cmdIdx + 1);
+      els.termInput.value = term.cmds[term.cmdIdx] || "";
+      autoGrowTerm();
+    }
+  });
+  els.termInput.addEventListener("input", autoGrowTerm);
+  els.termClear.addEventListener("click", termClearAll);
+  els.termModel.addEventListener("change", async () => {
+    const sel = parseSel(els.termModel.value);
+    if (!sel.providerId) return;
+    settings.provider = sel.providerId;
+    settings.models = settings.models || {};
+    settings.models[sel.providerId] = sel.modelId;
+    await setSettings({ provider: sel.providerId });
+    await setNested("models", sel.providerId, sel.modelId);
+    if (els.modelSelect) els.modelSelect.value = els.termModel.value;
+  });
+
   els.openOptions.addEventListener("click", () => browser.runtime.openOptionsPage());
   els.modelConnect.addEventListener("click", () => browser.runtime.openOptionsPage());
   if (els.emptyOptions) els.emptyOptions.addEventListener("click", () => browser.runtime.openOptionsPage());

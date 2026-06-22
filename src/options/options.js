@@ -305,8 +305,29 @@ async function connectAccount(id) {
 }
 
 $("save").addEventListener("click", save);
+$("quickConnect").addEventListener("click", async () => {
+  flash($("quickStatus"), "Connexion…");
+  await connectAccount("openrouter");
+  flash($("quickStatus"), isConnected("openrouter", settings) ? "✓ Connecté — clé enregistrée ci-dessous." : "");
+});
 $("clearHistoryBtn").addEventListener("click", async () => {
   await clearConversations();
   flash($("status"), "✓ Historique effacé.");
 });
+
+// Reflect connections made elsewhere (e.g. the sidebar's quick-connect): when the
+// stored keys / providers change, rebuild the cards so the new API key shows up
+// here without a manual refresh.
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
+  if (!(changes.keys || changes.baseUrls || changes.localEnabled || changes.provider)) return;
+  getSettings().then((s) => {
+    settings = s;
+    modelLists = { ...(s.modelLists || {}) };
+    buildProviderFields();
+    buildImageProvider();
+    refreshModelLists();
+  });
+});
+
 load();
