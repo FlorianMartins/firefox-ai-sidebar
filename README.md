@@ -1,4 +1,4 @@
-# AI Sidebar — IA multi-fournisseurs pour Firefox
+# AI Sidebar — IA multi-fournisseurs pour Firefox & Chromium
 
 Une extension Firefox **open-source** qui ajoute une **sidebar IA** à la manière de
 [sider.ai](https://sider.ai), mais où **vous branchez votre propre IA** (BYOK) et
@@ -62,7 +62,9 @@ l'aperçu sandboxé) — Firefox 152 :
 > réponse type), rendue dans Firefox sous Xvfb. Validé par `web-ext lint`
 > (0 erreur ; les avertissements proviennent uniquement des libs vendorées).
 
-## Installation (développement)
+## Installation
+
+### Firefox (développement)
 
 1. Ouvrir `about:debugging#/runtime/this-firefox`
 2. **Charger un module complémentaire temporaire…**
@@ -70,6 +72,23 @@ l'aperçu sandboxé) — Firefox 152 :
 4. La sidebar s'ouvre via l'icône de la barre latérale ou `Ctrl+Shift+Y`
 5. Cliquer ⚙ **Réglages** et renseigner **au moins une clé API** (ou pointer un
    modèle local Ollama / LM Studio, sans clé)
+
+### Chromium (Chrome / Edge / Brave…)
+
+L'extension est **cross-browser** : le même code tourne sur Chromium grâce à
+[`browser-polyfill`](https://github.com/mozilla/webextension-polyfill) et à un
+manifest dédié (`side_panel` + service worker au lieu de `sidebar_action`).
+
+1. Construire le paquet : `bash scripts/build-chrome.sh` → `ai-sidebar-chrome-<version>.zip`
+   (ou décompresser le zip fourni)
+2. Ouvrir `chrome://extensions`, activer le **Mode développeur**
+3. **« Charger l'extension non empaquetée »** → sélectionner le dossier `.build-chrome/`
+   (ou le contenu décompressé du zip)
+4. Cliquer l'icône de la barre d'outils pour ouvrir le **panneau latéral**
+
+> Note : Chrome ne permet pas la distribution d'un `.crx` permanent hors
+> **Chrome Web Store** (compte développeur payant). Le chargement « non empaqueté »
+> ci-dessus est la voie sans store ; il nécessite de garder le Mode développeur actif.
 
 ## Fournisseurs
 
@@ -92,8 +111,11 @@ l'aperçu sandboxé) — Firefox 152 :
 ## Architecture
 
 ```
-manifest.json            MV3, sidebar_action (spécifique Firefox)
+manifest.json            MV3 Firefox (sidebar_action, event page)
+manifest.chrome.json     MV3 Chromium (side_panel, service worker)
+scripts/build-chrome.sh  Assemble le paquet Chromium (.zip / dossier)
 src/
+  background/sw-chrome.js  Entrée service worker Chromium (importScripts)
   background/            Event page : menus contextuels (résumer/traduire/…)
   sidebar/               UI principale (chat, streaming, thinking, actions rapides)
   content/               Lecture page + actions DOM + notif. de navigation SPA

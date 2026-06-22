@@ -31,39 +31,56 @@ const MENU_ACTION = {
   "ai-reply": "reply",
 };
 
+// Cross-browser sidebar open: Firefox exposes sidebarAction; Chromium uses
+// sidePanel. We call it synchronously inside the click handler so the user
+// gesture is preserved (Chromium requires it).
+function openSidebar(tab) {
+  try {
+    if (typeof browser !== "undefined" && browser.sidebarAction && browser.sidebarAction.open) {
+      return browser.sidebarAction.open();
+    }
+  } catch (_) {}
+  try {
+    if (typeof chrome !== "undefined" && chrome.sidePanel && chrome.sidePanel.open) {
+      return chrome.sidePanel.open({ windowId: tab && tab.windowId });
+    }
+  } catch (_) {}
+}
+
 browser.runtime.onInstalled.addListener(() => {
   browser.contextMenus.removeAll().then(() => {
     for (const m of MENU) browser.contextMenus.create(m);
   });
+  // Chromium: make the toolbar action open the side panel.
+  try {
+    if (typeof chrome !== "undefined" && chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
+      chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+    }
+  } catch (_) {}
 });
 
-async function queueAndOpen(action, text) {
-  await browser.storage.local.set({
-    pendingAction: { action, text: text || "", ts: Date.now() },
-  });
-  try {
-    await browser.sidebarAction.open();
-  } catch (_) {
-    // open() must run inside a user gesture; the menu click usually qualifies.
-    // If it doesn't, the sidebar consumes the pending action next time it opens.
-  }
-}
-
-browser.contextMenus.onClicked.addListener(async (info) => {
+browser.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "ai-open") {
-    browser.sidebarAction.open();
+    openSidebar(tab);
     return;
   }
   const action = MENU_ACTION[info.menuItemId];
   if (!action) return;
-  await queueAndOpen(action, info.selectionText || "");
+  // Fire-and-forget the storage write, then open synchronously (keep the gesture).
+  browser.storage.local.set({
+    pendingAction: { action, text: info.selectionText || "", ts: Date.now() },
+  });
+  openSidebar(tab);
 });
 
 // Webmail helper: the content-script button forwards the email thread here.
 // If the sidebar is already open it also receives this message directly and acts
-// live; this handler is the fallback that opens the sidebar with the draft queued.
-browser.runtime.onMessage.addListener((msg) => {
+// live; this handler is the fallback that queues the draft and tries to open.
+browser.runtime.onMessage.addListener((msg, sender) => {
   if (msg && msg.type === "draft_reply") {
-    queueAndOpen("reply", msg.thread || "");
+    browser.storage.local.set({
+      pendingAction: { action: "reply", text: msg.thread || "", ts: Date.now() },
+    });
+    openSidebar(sender && sender.tab);
   }
 });

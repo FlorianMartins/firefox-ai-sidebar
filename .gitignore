@@ -3,6 +3,7 @@ web-ext-artifacts/
 .web-ext-artifacts/
 .build/
 .build-artifacts/
+.build-chrome/
 *.zip
 *.xpi
 .DS_Store
