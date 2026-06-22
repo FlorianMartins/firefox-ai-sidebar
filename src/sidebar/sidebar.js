@@ -24,6 +24,7 @@ const els = {
   modelWrap: $("modelWrap"),
   modelConnect: $("modelConnect"),
   refreshModels: $("refreshModels"),
+  sourceSeg: $("sourceSeg"),
   historyBtn: $("historyBtn"),
   newChat: $("newChat"),
   openOptions: $("openOptions"),
@@ -55,6 +56,11 @@ const els = {
   improvePreset: $("improvePreset"),
   imageSize: $("imageSize"),
   imageProviderNote: $("imageProviderNote"),
+  siteView: $("siteView"),
+  siteFrame: $("siteFrame"),
+  siteInsertPage: $("siteInsertPage"),
+  siteInsertSel: $("siteInsertSel"),
+  siteReload: $("siteReload"),
   confirmBar: $("confirmBar"),
   confirmText: $("confirmText"),
   confirmAllow: $("confirmAllow"),
@@ -82,9 +88,30 @@ const PLACEHOLDERS = {
   terminal: "Demandez du code, une commande, un script…",
 };
 
+// "Account / site" mode: the provider's own chat website, used with the user's
+// account/subscription (like Firefox's native AI sidebar).
+const SITE_PROVIDERS = [
+  ["chatgpt", "ChatGPT (OpenAI)", "https://chatgpt.com/"],
+  ["claude", "Claude (Anthropic)", "https://claude.ai/new"],
+  ["gemini", "Gemini (Google)", "https://gemini.google.com/app"],
+  ["mistral", "Le Chat (Mistral)", "https://chat.mistral.ai/chat"],
+  ["copilot", "Copilot (Microsoft)", "https://copilot.microsoft.com/"],
+  ["perplexity", "Perplexity", "https://www.perplexity.ai/"],
+  ["grok", "Grok (xAI)", "https://grok.com/"],
+  ["deepseek", "DeepSeek", "https://chat.deepseek.com/"],
+  ["huggingchat", "HuggingChat", "https://huggingface.co/chat/"],
+];
+
 async function init() {
   configureMarkdown();
   settings = await getSettings();
+  // Always open in API/chat mode. Never restore an embedded-site engine on load:
+  // a site that blocks framing (ChatGPT/Gemini…) would render blank and hide the
+  // whole chat UI. The user re-selects "Compte" per session if they want it.
+  if (settings.useSite) {
+    settings.useSite = false;
+    await setSettings({ useSite: false });
+  }
   populateModelSelector();
   populateImprovePresets();
   els.thinking.checked = settings.thinking;
@@ -128,41 +155,76 @@ function modelsOf(providerId) {
   return out;
 }
 
-// Fill the model <select> with your connected API providers' models (grouped),
-// preceded by a neutral placeholder.
+// Fill a <select> with the engines: provider WEBSITES (your account, no key) first,
+// then your connected API providers' models. Picking a "site|…" entry switches the
+// Chat to the embedded website; picking a model uses the API.
 function fillModelSelect(sel, selectedValue) {
   sel.innerHTML = "";
-  const ph = document.createElement("option");
-  ph.value = "";
-  ph.textContent = "— Choisir un modèle —";
-  sel.appendChild(ph);
-  for (const pid of providersToShow()) {
-    const group = document.createElement("optgroup");
-    const noKey = !(keyFor(pid, settings) || PROVIDERS[pid].local);
-    group.label = PROVIDERS[pid].label + (noKey ? " (clé manquante)" : "");
-    for (const [mid, mlabel] of modelsOf(pid)) {
+  if (settings.useSite) {
+    // "Compte" source: the provider websites (used with the user's account).
+    const g = document.createElement("optgroup");
+    g.label = "👤 Mon compte — sites";
+    for (const [id, label] of SITE_PROVIDERS) {
       const o = document.createElement("option");
-      o.value = pid + "|" + mid;
-      o.textContent = mlabel;
-      group.appendChild(o);
+      o.value = "site|" + id;
+      o.textContent = label;
+      g.appendChild(o);
     }
-    sel.appendChild(group);
+    sel.appendChild(g);
+  } else {
+    // "API" source: your connected providers' models (by key).
+    const ph = document.createElement("option");
+    ph.value = "";
+    ph.textContent = "— Choisir un modèle —";
+    sel.appendChild(ph);
+    for (const pid of providersToShow()) {
+      const group = document.createElement("optgroup");
+      const noKey = !(keyFor(pid, settings) || PROVIDERS[pid].local);
+      group.label = "🔑 " + PROVIDERS[pid].label + (noKey ? " (clé manquante)" : "");
+      for (const [mid, mlabel] of modelsOf(pid)) {
+        const o = document.createElement("option");
+        o.value = pid + "|" + mid;
+        o.textContent = mlabel;
+        group.appendChild(o);
+      }
+      sel.appendChild(group);
+    }
   }
   if (selectedValue) sel.value = selectedValue;
 }
 
 function populateModelSelector() {
   const connected = connectedProviders(settings);
-  // Show the connect button only when no provider is set up yet.
-  els.modelConnect.classList.toggle("hidden", connected.length > 0);
-  els.refreshModels.classList.remove("hidden");
+  // "Compte" source needs no key/refresh. "API" source shows the connect button
+  // when no provider is set up yet.
+  els.modelConnect.classList.toggle("hidden", settings.useSite || connected.length > 0);
+  els.refreshModels.classList.toggle("hidden", settings.useSite);
   els.modelWrap.classList.remove("hidden");
   let val = "";
-  if (connected.length) {
+  if (settings.useSite) {
+    val = "site|" + (settings.siteProvider || SITE_PROVIDERS[0][0]);
+  } else if (connected.length) {
     const pid = connected.includes(settings.provider) ? settings.provider : connected[0];
     val = pid + "|" + modelFor(pid, settings);
   }
   fillModelSelect(els.modelSelect, val);
+  updateSourceSeg();
+  syncEngine();
+}
+
+// Reflect the active source on the segmented switch (API vs Compte).
+function updateSourceSeg() {
+  els.sourceSeg.querySelectorAll(".seg").forEach((b) =>
+    b.classList.toggle("active", (b.dataset.src === "account") === !!settings.useSite)
+  );
+}
+
+// Switch source (false = API, true = Compte/site).
+async function setSource(useSite) {
+  if (settings.useSite === useSite) return;
+  settings.useSite = useSite;
+  await setSettings({ useSite });
+  populateModelSelector(); // repopulate the menu + sync the engine/view
 }
 
 function parseSel(value) {
@@ -194,12 +256,18 @@ function populateImprovePresets() {
 
 async function onModelChange() {
   const sel = currentSelection();
-  if (!sel.providerId) return;
-  settings.provider = sel.providerId;
-  settings.models = settings.models || {};
-  settings.models[sel.providerId] = sel.modelId;
-  await setSettings({ provider: sel.providerId });
-  await setNested("models", sel.providerId, sel.modelId);
+  if (settings.useSite) {
+    settings.siteProvider = sel.modelId;
+    await setSettings({ siteProvider: sel.modelId });
+  } else if (sel.providerId && sel.providerId !== "site") {
+    settings.provider = sel.providerId;
+    settings.models = settings.models || {};
+    settings.models[sel.providerId] = sel.modelId;
+    settings.lastApiValue = els.modelSelect.value;
+    await setSettings({ provider: sel.providerId, lastApiValue: els.modelSelect.value });
+    await setNested("models", sel.providerId, sel.modelId);
+  }
+  syncEngine();
 }
 
 // Best-effort: fetch the real available model list for every connected provider.
@@ -230,6 +298,13 @@ async function refreshModelsFromApi() {
 
 // ----- Workspace modes ------------------------------------------------------
 function setMode(next) {
+  // Switching to an API workspace (anything but Chat) exits the embedded-site source.
+  if (settings.useSite && next !== "chat") {
+    settings.useSite = false;
+    setSettings({ useSite: false });
+    document.body.classList.remove("mode-site");
+    populateModelSelector();
+  }
   mode = next;
   settings.mode = next;
   setSettings({ mode: next });
@@ -241,6 +316,42 @@ function setMode(next) {
   els.imageControls.classList.toggle("hidden", next !== "image");
   document.body.classList.toggle("mode-terminal", next === "terminal");
   els.input.placeholder = PLACEHOLDERS[next] || PLACEHOLDERS.chat;
+  syncEngine(); // restore the embedded site if a "site|…" engine is selected (Chat)
+}
+
+// ----- Embedded provider website (account engine) --------------------------
+function siteUrl(id) {
+  const p = SITE_PROVIDERS.find((s) => s[0] === id);
+  return p ? p[2] : SITE_PROVIDERS[0][2];
+}
+// Show the embedded site ONLY when the user has explicitly chosen one
+// (settings.useSite). Never auto-enter site mode on load — otherwise a blank /
+// blocked iframe would hide the whole chat UI.
+function syncEngine() {
+  const isSite = settings.useSite === true;
+  document.body.classList.toggle("mode-site", isSite);
+  if (isSite) loadSite(settings.siteProvider);
+}
+function loadSite(id) {
+  const url = siteUrl(id || settings.siteProvider);
+  if (els.siteFrame.dataset.url !== url) {
+    els.siteFrame.dataset.url = url;
+    els.siteFrame.src = url; // (re)load only when the site actually changes
+  }
+}
+function insertIntoSite(text) {
+  try {
+    els.siteFrame.contentWindow.postMessage({ __aiSiteInsert: true, text }, "*");
+  } catch (_) {}
+}
+async function siteInsertPage() {
+  const p = await executeTool("read_page", {}, {});
+  if (!p || p.error || !p.text) return addMessage("error", "Page illisible.");
+  insertIntoSite(`Contenu de la page « ${p.title || ""} » (${p.url}) :\n\n${(p.text || "").slice(0, settings.maxPageChars)}\n\n`);
+}
+async function siteInsertSelection() {
+  const sel = await getSelection();
+  if (sel) insertIntoSite(sel + "\n\n");
 }
 
 // ----- Page awareness -------------------------------------------------------
@@ -480,6 +591,17 @@ function wire() {
   els.newChat.addEventListener("click", newChat);
   els.openOptions.addEventListener("click", () => browser.runtime.openOptionsPage());
   els.modelConnect.addEventListener("click", () => browser.runtime.openOptionsPage());
+  els.sourceSeg.querySelectorAll(".seg").forEach((b) =>
+    b.addEventListener("click", () => setSource(b.dataset.src === "account"))
+  );
+
+  els.siteInsertPage.addEventListener("click", siteInsertPage);
+  els.siteInsertSel.addEventListener("click", siteInsertSelection);
+  els.siteReload.addEventListener("click", () => {
+    const u = siteUrl(settings.siteProvider);
+    els.siteFrame.dataset.url = u;
+    els.siteFrame.src = u;
+  });
 
   onSettingsChanged(async () => {
     settings = await getSettings();

@@ -45,13 +45,19 @@
     </div>
 
     <div class="modelbar">
-      <div class="select-wrap">
-        <select>
-          <optgroup label="Claude (Anthropic)"><option>Claude Opus 4.8</option></optgroup>
-          <optgroup label="OpenAI"><option>GPT-4o</option></optgroup>
-        </select>
+      <div class="srcseg">
+        <button class="seg active" data-src="api">🔑 API</button>
+        <button class="seg" data-src="account">👤 Compte</button>
       </div>
-      <button class="icon">⟳</button>
+      <div class="modelrow">
+        <div class="select-wrap">
+          <select>
+            <optgroup label="🔑 Claude (Anthropic)"><option>Claude Opus 4.8</option></optgroup>
+            <optgroup label="🔑 OpenAI"><option>GPT-4o</option></optgroup>
+          </select>
+        </div>
+        <button class="icon">⟳</button>
+      </div>
     </div>
 
     <footer class="composer">

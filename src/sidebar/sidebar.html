@@ -29,6 +29,18 @@
       <button class="mode" data-mode="terminal">⌨ Terminal</button>
     </nav>
 
+    <!-- Embedded provider website (shown in Chat when a "Site (mon compte)" entry
+         is picked in the model selector). Uses the user's account/subscription. -->
+    <div id="siteView" class="siteview hidden">
+      <div class="site-toolbar">
+        <span class="muted site-hint">🌐 Site connecté à votre compte — donnez-lui la page :</span>
+        <button id="siteInsertPage" class="chip-btn" title="Insérer le contenu de l'onglet actif">📄 Page</button>
+        <button id="siteInsertSel" class="chip-btn" title="Insérer la sélection">✂ Sélection</button>
+        <button id="siteReload" class="icon" title="Recharger">⟳</button>
+      </div>
+      <iframe id="siteFrame" class="site-frame" referrerpolicy="no-referrer"></iframe>
+    </div>
+
     <!-- History panel -->
     <div id="historyPanel" class="panel hidden">
       <div class="panel-head">
@@ -122,11 +134,17 @@
     <!-- Unified model picker: between the controls and the composer.
          When no provider is connected, the picker is replaced by a Connect button. -->
     <div class="modelbar">
-      <div class="select-wrap" id="modelWrap">
-        <select id="modelSelect" title="Modèle"></select>
+      <div class="srcseg" id="sourceSeg" title="Source : API (clé) ou Compte (site du fournisseur)">
+        <button class="seg active" data-src="api">🔑 API</button>
+        <button class="seg" data-src="account">👤 Compte</button>
       </div>
-      <button id="refreshModels" class="icon" title="Rafraîchir les modèles disponibles">⟳</button>
-      <button id="modelConnect" class="btn-grad hidden">🔌 Se connecter à un fournisseur</button>
+      <div class="modelrow">
+        <div class="select-wrap" id="modelWrap">
+          <select id="modelSelect" title="Modèle ou site"></select>
+        </div>
+        <button id="refreshModels" class="icon" title="Rafraîchir les modèles disponibles">⟳</button>
+        <button id="modelConnect" class="btn-grad hidden">🔌 Se connecter à un fournisseur</button>
+      </div>
     </div>
 
     <footer class="composer">

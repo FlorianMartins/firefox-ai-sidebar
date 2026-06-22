@@ -23,6 +23,9 @@ const DEFAULTS = {
 
   // ----- UI / behaviour ------------------------------------------------------
   mode: "chat", // active workspace tab: chat | translate | improve | image | terminal
+  useSite: false, // engine: embedded provider website (account) instead of an API
+  siteProvider: "chatgpt", // which provider website to embed
+  lastApiValue: "", // last selected API model "provider|model" (to return to)
   thinking: false, // surface the model's reasoning (supported models only)
   webSearch: false, // server-side web search (Anthropic)
   agentMode: false, // allow the model to act inside the browser

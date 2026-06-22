@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AI Sidebar — IA multi-fournisseurs",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Sidebar IA open-source type Sider : branchez votre IA (Claude, OpenAI, Gemini, Mistral, Groq, DeepSeek, xAI, Perplexity, Together, Fireworks, OpenRouter, Ollama/LM Studio local…). Liste les modèles réellement dispo selon votre clé/compte. Lit page et onglets, résume, traduit, améliore (presets), compare un modèle à un autre, artifacts interactifs, images, répond aux mails, agent (sans achat). Historique local, 100% BYOK.",
   "author": "Florian Martins",
   "content_security_policy": {
@@ -24,7 +24,9 @@
     "scripting",
     "contextMenus",
     "clipboardWrite",
-    "identity"
+    "identity",
+    "webRequest",
+    "webRequestBlocking"
   ],
   "host_permissions": [
     "https://api.anthropic.com/*",
@@ -65,6 +67,25 @@
       ],
       "run_at": "document_idle",
       "all_frames": false
+    },
+    {
+      "matches": [
+        "*://chatgpt.com/*",
+        "*://chat.openai.com/*",
+        "*://claude.ai/*",
+        "*://gemini.google.com/*",
+        "*://chat.mistral.ai/*",
+        "*://copilot.microsoft.com/*",
+        "*://www.perplexity.ai/*",
+        "*://grok.com/*",
+        "*://chat.deepseek.com/*",
+        "*://huggingface.co/*"
+      ],
+      "js": [
+        "src/content/site-inject.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ],
   "commands": {
