@@ -57,13 +57,11 @@
         <div class="empty-logo"><img src="../../icons/icon.svg" alt="" /></div>
         <p class="empty-title">Sidebar IA — branchez votre IA</p>
         <p class="muted">
-          Connectez-vous à un fournisseur (compte ou clé API) pour commencer :
+          Pour commencer, connectez un fournisseur via le bouton
+          <b>« 🔌 Se connecter »</b> ci-dessous (compte ou clé API) :
           Claude, OpenAI, Gemini, OpenRouter, Mistral, Groq, DeepSeek, xAI,
           Perplexity… ou un modèle <b>local</b> (Ollama / LM Studio).
         </p>
-        <div class="empty-actions">
-          <button id="connectBtn" class="btn-grad">🔌 Se connecter / Ajouter un fournisseur</button>
-        </div>
       </div>
     </main>
 
@@ -78,17 +76,17 @@
     <!-- Adaptive control row (toggles / per-mode controls) -->
     <div class="controls" id="controls">
       <div class="ctl-group" id="chatControls">
-        <label class="switch" title="Afficher le raisonnement du modèle">
-          <input type="checkbox" id="thinking" /><span class="track"></span><span class="lbl">💭 Réflexion</span>
+        <label class="chip" title="Afficher le raisonnement du modèle">
+          <input type="checkbox" id="thinking" /><span>💭 Réflexion</span>
         </label>
-        <label class="switch" title="Recherche web (Claude)">
-          <input type="checkbox" id="webSearch" /><span class="track"></span><span class="lbl">🌐 Web</span>
+        <label class="chip" title="Recherche web (Claude)">
+          <input type="checkbox" id="webSearch" /><span>🌐 Web</span>
         </label>
-        <label class="switch" title="Le modèle peut agir dans le navigateur (sans achat)">
-          <input type="checkbox" id="agentMode" /><span class="track"></span><span class="lbl">🤖 Agent</span>
+        <label class="chip" title="Le modèle peut agir dans le navigateur (sans achat)">
+          <input type="checkbox" id="agentMode" /><span>🤖 Agent</span>
         </label>
-        <label class="switch" title="L'IA voit la page consultée">
-          <input type="checkbox" id="pageCtx" /><span class="track"></span><span class="lbl">👁 Page</span>
+        <label class="chip" title="L'IA voit la page consultée">
+          <input type="checkbox" id="pageCtx" /><span>👁 Page</span>
         </label>
       </div>
 

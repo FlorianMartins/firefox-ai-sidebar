@@ -213,6 +213,22 @@ button { cursor: pointer; }
 }
 .ctl-group select:focus { outline: none; border-color: var(--accent); }
 
+/* Control chips (Réflexion / Web / Agent / Page) — toggle buttons like the tabs:
+   coloured + framed when active, neutral when inactive. */
+#chatControls { gap: 4px; }
+.ctl-group .chip {
+  flex: 1 1 0; min-width: 0; justify-content: center;
+  display: inline-flex; align-items: center; gap: 5px; padding: 7px 6px;
+  border: 1px solid var(--border); border-radius: 9px; background: transparent;
+  color: var(--muted); font-size: 11.5px; font-weight: 600; cursor: pointer;
+  user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: 0.15s;
+}
+.ctl-group .chip input { position: absolute; opacity: 0; width: 0; height: 0; }
+.ctl-group .chip:hover { color: var(--text); border-color: var(--accent-2); }
+.ctl-group .chip:has(input:checked) {
+  color: var(--text); background: var(--grad-soft); border-color: rgba(139, 92, 246, 0.6);
+}
+
 /* ----- Composer ----- */
 .composer {
   display: flex; gap: 8px; align-items: flex-end; padding: 10px;
@@ -281,6 +297,18 @@ body.mode-terminal .msg.user {
 body.mode-terminal .msg.user::before { content: "$ "; color: #7ee787; font-weight: 700; }
 body.mode-terminal .msg.assistant { background: #0c0e14; border-color: #1c2233; }
 body.mode-terminal .composer textarea { font-family: ui-monospace, monospace; }
+/* Homogenise the response font in Terminal mode (one consistent monospace). */
+body.mode-terminal .msg.assistant,
+body.mode-terminal .msg.assistant p,
+body.mode-terminal .msg.assistant li,
+body.mode-terminal .msg.assistant a,
+body.mode-terminal .msg.assistant strong,
+body.mode-terminal .msg.assistant em,
+body.mode-terminal .msg.assistant td,
+body.mode-terminal .msg.assistant th { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+body.mode-terminal .msg.assistant h1,
+body.mode-terminal .msg.assistant h2,
+body.mode-terminal .msg.assistant h3 { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; margin: 8px 0 4px; }
 
 /* ----- Per-message compare bar (on the latest answer) ----- */
 .msg-actions {

@@ -73,7 +73,7 @@ function buildCard(id) {
     sec.appendChild(btn);
     sec.appendChild(el("p", "muted hint", OAUTH.has(id)
       ? "Compte (Google / GitHub / email) → débloque tous les modèles, y compris gratuits."
-      : "Ouvre le site du fournisseur : connectez-vous à VOTRE compte, créez une clé API, puis collez-la ci-dessous."));
+      : "Ouvre la page de connexion du fournisseur : identifiez-vous avec VOTRE compte, créez une clé API, puis collez-la ci-dessous. (Un abonnement type ChatGPT Plus / Claude Pro ne donne pas accès à l'API — il faut une clé.)"));
   }
 
   // Local server: explicit opt-in.

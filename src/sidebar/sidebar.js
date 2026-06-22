@@ -55,7 +55,6 @@ const els = {
   improvePreset: $("improvePreset"),
   imageSize: $("imageSize"),
   imageProviderNote: $("imageProviderNote"),
-  connectBtn: $("connectBtn"),
   confirmBar: $("confirmBar"),
   confirmText: $("confirmText"),
   confirmAllow: $("confirmAllow"),
@@ -170,9 +169,8 @@ function currentSelection() {
 }
 
 function syncToggleVisibility() {
-  // Keep the Web toggle always visible (it drives real web search on Claude and the
-  // "research" quick action everywhere). Never hide it based on the provider.
-  els.webSearch.closest(".switch").style.display = "";
+  // No-op: the control chips (incl. Web) are always visible now. Kept as a hook
+  // in case provider-specific UI tweaks are needed later.
 }
 function updateImageNote() {
   const meta = PROVIDERS[settings.imageProvider || "openai"];
@@ -475,7 +473,6 @@ function wire() {
   els.stop.addEventListener("click", () => abortController && abortController.abort());
   els.newChat.addEventListener("click", newChat);
   els.openOptions.addEventListener("click", () => browser.runtime.openOptionsPage());
-  els.connectBtn.addEventListener("click", () => browser.runtime.openOptionsPage());
   els.modelConnect.addEventListener("click", () => browser.runtime.openOptionsPage());
 
   onSettingsChanged(async () => {
