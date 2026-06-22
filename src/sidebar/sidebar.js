@@ -152,6 +152,11 @@ function modelsOf(providerId) {
 // Chat to the embedded website; picking a model uses the API.
 function fillModelSelect(sel, selectedValue) {
   sel.innerHTML = "";
+  // Neutral placeholder (kept selectable when nothing is connected yet).
+  const ph = document.createElement("option");
+  ph.value = "";
+  ph.textContent = "— Choisir un modèle ou un site —";
+  sel.appendChild(ph);
   const siteGroup = document.createElement("optgroup");
   siteGroup.label = "🌐 Sites (mon compte)";
   for (const [id, label] of SITE_PROVIDERS) {
@@ -184,15 +189,14 @@ function populateModelSelector() {
   els.modelConnect.classList.toggle("hidden", connected.length > 0);
   els.modelWrap.classList.remove("hidden");
   els.refreshModels.classList.remove("hidden");
-  let val;
+  let val = "";
   if (settings.useSite) {
     val = "site|" + (settings.siteProvider || SITE_PROVIDERS[0][0]);
   } else if (connected.length) {
     const pid = connected.includes(settings.provider) ? settings.provider : connected[0];
     val = pid + "|" + modelFor(pid, settings);
-  } else {
-    val = "site|" + (settings.siteProvider || SITE_PROVIDERS[0][0]);
   }
+  // else: leave the neutral placeholder selected (no API yet, no site chosen).
   fillModelSelect(els.modelSelect, val);
   syncEngine();
 }
@@ -296,12 +300,13 @@ function siteUrl(id) {
   const p = SITE_PROVIDERS.find((s) => s[0] === id);
   return p ? p[2] : SITE_PROVIDERS[0][2];
 }
-// Show the embedded site (and load it) when a "site|…" engine is selected.
+// Show the embedded site ONLY when the user has explicitly chosen one
+// (settings.useSite). Never auto-enter site mode on load — otherwise a blank /
+// blocked iframe would hide the whole chat UI.
 function syncEngine() {
-  const sel = currentSelection();
-  const isSite = sel.providerId === "site";
+  const isSite = settings.useSite === true;
   document.body.classList.toggle("mode-site", isSite);
-  if (isSite) loadSite(sel.modelId);
+  if (isSite) loadSite(settings.siteProvider);
 }
 function loadSite(id) {
   const url = siteUrl(id || settings.siteProvider);
