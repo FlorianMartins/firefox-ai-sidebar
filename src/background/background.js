@@ -73,65 +73,6 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
   openSidebar(tab);
 });
 
-// --- "Account / site" mode: embed provider chat websites in the sidebar -------
-// Provider chat sites block being framed (X-Frame-Options / CSP frame-ancestors).
-// To let the user sign in with THEIR account and use the site inside the sidebar
-// (like Firefox's native AI sidebar), we strip those headers — only for these
-// hosts and only for sub-frame requests. Firefox uses blocking webRequest;
-// Chromium uses declarativeNetRequest session rules.
-const SITE_HOSTS = [
-  "chatgpt.com", "chat.openai.com", "claude.ai", "gemini.google.com",
-  "chat.mistral.ai", "copilot.microsoft.com", "www.perplexity.ai",
-  "grok.com", "chat.deepseek.com", "huggingface.co",
-];
-
-function stripFrameAncestors(csp) {
-  return csp
-    .split(";")
-    .filter((d) => !/^\s*frame-ancestors/i.test(d))
-    .join(";");
-}
-
-function setupFramingBypass() {
-  // Firefox: blocking webRequest (precise — only drop framing protections).
-  if (typeof browser !== "undefined" && browser.webRequest && browser.webRequest.onHeadersReceived) {
-    try {
-      browser.webRequest.onHeadersReceived.addListener(
-        (details) => {
-          const headers = [];
-          for (const h of details.responseHeaders || []) {
-            const n = h.name.toLowerCase();
-            if (n === "x-frame-options") continue;
-            if (n === "content-security-policy" && h.value) h.value = stripFrameAncestors(h.value);
-            if (n === "content-security-policy-report-only") continue;
-            headers.push(h);
-          }
-          return { responseHeaders: headers };
-        },
-        { urls: SITE_HOSTS.map((h) => `*://${h}/*`), types: ["sub_frame"] },
-        ["blocking", "responseHeaders"]
-      );
-      return;
-    } catch (_) {}
-  }
-  // Chromium: declarativeNetRequest session rule.
-  if (typeof chrome !== "undefined" && chrome.declarativeNetRequest && chrome.declarativeNetRequest.updateSessionRules) {
-    chrome.declarativeNetRequest.updateSessionRules({
-      removeRuleIds: [9001],
-      addRules: [{
-        id: 9001, priority: 1,
-        action: { type: "modifyHeaders", responseHeaders: [
-          { header: "x-frame-options", operation: "remove" },
-          { header: "content-security-policy", operation: "remove" },
-          { header: "content-security-policy-report-only", operation: "remove" },
-        ] },
-        condition: { requestDomains: SITE_HOSTS, resourceTypes: ["sub_frame"] },
-      }],
-    }).catch(() => {});
-  }
-}
-setupFramingBypass();
-
 // Webmail helper: the content-script button forwards the email thread here.
 // If the sidebar is already open it also receives this message directly and acts
 // live; this handler is the fallback that queues the draft and tries to open.

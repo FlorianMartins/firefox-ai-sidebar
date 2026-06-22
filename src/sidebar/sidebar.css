@@ -64,21 +64,10 @@ button { cursor: pointer; }
 
 /* ----- Unified model bar ----- */
 .modelbar {
-  display: flex; flex-direction: column; gap: 7px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   padding: 8px 10px 9px; background: var(--panel);
 }
-.modelrow { display: flex; align-items: center; gap: 8px; }
 .modelbar #modelConnect { flex: 1 1 auto; }
-/* Segmented source switch: API (key) vs Compte (provider website) */
-.srcseg { display: flex; gap: 3px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; padding: 2px; }
-.srcseg .seg {
-  flex: 1 1 0; padding: 5px 8px; font-size: 11.5px; font-weight: 600;
-  border: 0; border-radius: 7px; background: transparent; color: var(--muted);
-  white-space: nowrap; cursor: pointer; transition: 0.15s;
-}
-.srcseg .seg:hover { color: var(--text); }
-.srcseg .seg.active { background: var(--grad); color: #fff; }
-.vs { color: var(--accent); font-weight: 700; font-size: 12px; }
 .select-wrap {
   flex: 1 1 140px; min-width: 0; position: relative; border-radius: var(--radius-sm);
   padding: 1px; background: var(--grad);
@@ -337,33 +326,5 @@ body.mode-terminal .msg.assistant h3 { font-family: ui-monospace, SFMono-Regular
 }
 .cmp-btn:hover { border-color: var(--accent); }
 .cmp-btn:disabled { opacity: 0.5; cursor: default; }
-
-/* ----- Account / site mode (embedded provider websites) ----- */
-.siteview { display: none; flex: 1; flex-direction: column; min-height: 0; }
-body.mode-site .siteview { display: flex; }
-body.mode-site #messages,
-body.mode-site .controls,
-body.mode-site .composer,
-body.mode-site #pageBar,
-body.mode-site #confirmBar,
-body.mode-site #historyPanel,
-body.mode-site #tabsPanel { display: none !important; }
-.site-hint { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
-.site-toolbar {
-  display: flex; align-items: center; gap: 6px; padding: 6px 8px;
-  background: var(--panel); border-bottom: 1px solid var(--border-soft);
-}
-.site-toolbar select {
-  flex: 1; min-width: 0; appearance: none; -webkit-appearance: none;
-  padding: 6px 9px; background: var(--panel-2); border: 1px solid var(--border);
-  border-radius: 8px; color: var(--text); font-size: 12.5px; font-weight: 600;
-}
-.chip-btn {
-  font-size: 11.5px; padding: 6px 9px; border-radius: 8px; flex: 0 0 auto;
-  border: 1px solid rgba(139, 92, 246, 0.5); background: var(--grad-soft);
-  color: var(--text); font-weight: 600; white-space: nowrap;
-}
-.chip-btn:hover { border-color: var(--accent); }
-.site-frame { flex: 1; width: 100%; border: 0; background: #fff; }
 
 .hidden { display: none !important; }
