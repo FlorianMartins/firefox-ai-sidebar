@@ -105,6 +105,13 @@ const SITE_PROVIDERS = [
 async function init() {
   configureMarkdown();
   settings = await getSettings();
+  // Always open in API/chat mode. Never restore an embedded-site engine on load:
+  // a site that blocks framing (ChatGPT/Gemini…) would render blank and hide the
+  // whole chat UI. The user re-selects "Compte" per session if they want it.
+  if (settings.useSite) {
+    settings.useSite = false;
+    await setSettings({ useSite: false });
+  }
   populateModelSelector();
   populateImprovePresets();
   els.thinking.checked = settings.thinking;
