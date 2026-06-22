@@ -276,8 +276,20 @@ export const PROVIDER_ORDER = [
   "custom",
 ];
 
-// Image sizes accepted by the OpenAI-compatible /images/generations endpoint.
-export const IMAGE_SIZES = ["1024x1024", "1024x1792", "1792x1024", "512x512"];
+// Image sizes for the OpenAI-compatible /images/generations endpoint, labelled by
+// use-case. NOTE: the accepted sizes depend on the MODEL — gpt-image-1: 1024²,
+// 1536×1024, 1024×1536 ; DALL·E 3: 1024², 1792×1024, 1024×1792 ; DALL·E 2: 256²,
+// 512², 1024². True 4K / 1440p is not produced natively by current image models
+// (upscale the result afterwards). [value, label] pairs.
+export const IMAGE_SIZES = [
+  ["256x256", "Favicon — carré 256² (DALL·E 2)"],
+  ["512x512", "Petite icône — carré 512² (DALL·E 2)"],
+  ["1024x1024", "Logo / carré HD — 1024² (tous modèles)"],
+  ["1536x1024", "Paysage 3:2 — 1536×1024 (gpt-image-1)"],
+  ["1024x1536", "Portrait 2:3 — 1024×1536 (gpt-image-1)"],
+  ["1792x1024", "Paysage 16:9 « HD » — 1792×1024 (DALL·E 3)"],
+  ["1024x1792", "Portrait 9:16 « HD » — 1024×1792 (DALL·E 3)"],
+];
 
 // Effective base URL (honours the user's override for local / custom servers).
 export function baseUrlFor(providerId, settings) {

@@ -26,14 +26,17 @@
       <button class="mode" data-mode="translate">🌐 Traduire</button>
       <button class="mode" data-mode="improve">✨ Améliorer</button>
       <button class="mode" data-mode="image">🎨 Image</button>
-      <button class="mode" data-mode="terminal">⌨ Terminal</button>
+      <button class="mode" data-mode="terminal">&lt;/&gt; Code</button>
     </nav>
 
     <!-- History panel -->
     <div id="historyPanel" class="panel hidden">
       <div class="panel-head">
         <span>🕘 Historique <span class="muted">(local, privé)</span></span>
-        <button id="clearHistory" class="link-btn" title="Tout effacer">Tout effacer</button>
+        <div class="panel-head-actions">
+          <button id="clearHistory" class="link-btn" title="Tout effacer">Tout effacer</button>
+          <button id="closeHistory" class="icon" title="Fermer">✕</button>
+        </div>
       </div>
       <ul id="historyList" class="historylist"></ul>
     </div>
@@ -108,11 +111,11 @@
         <label class="chip" title="Afficher le raisonnement du modèle">
           <input type="checkbox" id="thinking" /><span>💭 Réflexion</span>
         </label>
+        <label class="chip" title="Le modèle peut agir dans le navigateur (sans achat) — modèle réglable dans ⚙">
+          <input type="checkbox" id="agentMode" /><span>🤖 Agent</span>
+        </label>
         <label class="chip" title="Recherche web (Perplexity / OpenRouter / Claude) — réglable dans ⚙">
           <input type="checkbox" id="webSearch" /><span>🌐 Web</span>
-        </label>
-        <label class="chip" title="Le modèle peut agir dans le navigateur (sans achat)">
-          <input type="checkbox" id="agentMode" /><span>🤖 Agent</span>
         </label>
         <label class="chip" title="L'IA voit la page consultée">
           <input type="checkbox" id="pageCtx" /><span>👁 Page</span>
@@ -139,10 +142,7 @@
 
       <div class="ctl-group hidden" id="imageControls">
         <label>Taille
-          <select id="imageSize">
-            <option>1024x1024</option><option>1024x1792</option>
-            <option>1792x1024</option><option>512x512</option>
-          </select>
+          <select id="imageSize" title="Tailles supportées selon le modèle. Le 4K/1440p natif n'existe pas sur les modèles d'image actuels — agrandissez l'image après coup."></select>
         </label>
         <span class="muted" id="imageProviderNote"></span>
       </div>

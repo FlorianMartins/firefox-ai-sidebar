@@ -186,7 +186,33 @@ function fillSelect(sel, items, value) {
 function buildImageProvider() {
   const imgProviders = PROVIDER_ORDER.filter((id) => PROVIDERS[id].supportsImages).map((id) => [id, PROVIDERS[id].label]);
   fillSelect($("imageProvider"), imgProviders, settings.imageProvider || "openai");
-  fillSelect($("imageSize"), IMAGE_SIZES.map((s) => [s, s]), settings.imageSize || "1024x1024");
+  fillSelect($("imageSize"), IMAGE_SIZES, settings.imageSize || "1024x1024");
+}
+
+// Agent-model picker: "Auto" + the catalogue models of every CONNECTED provider.
+// Lets the user pin a tool-capable model for agent mode (many free models can't
+// call tools). Mirrors buildSearchModelSelect.
+function buildAgentModelSelect() {
+  const sel = $("agentModel");
+  if (!sel) return;
+  sel.innerHTML = "";
+  const auto = el("option", null, "Auto (modèle sélectionné dans la sidebar)");
+  auto.value = "";
+  sel.appendChild(auto);
+  for (const id of PROVIDER_ORDER) {
+    if (!isConnected(id, settings)) continue;
+    const meta = PROVIDERS[id];
+    if (!meta.models || !meta.models.length) continue;
+    const group = document.createElement("optgroup");
+    group.label = meta.label;
+    for (const [mid, mlabel] of meta.models) {
+      const o = el("option", null, mlabel);
+      o.value = id + "|" + mid;
+      group.appendChild(o);
+    }
+    sel.appendChild(group);
+  }
+  sel.value = settings.agentModel || "";
 }
 
 // Web-search model picker: "Auto" + the catalogue models of every CONNECTED
@@ -239,6 +265,7 @@ async function load() {
   buildProviderFields();
   buildImageProvider();
   buildSearchModelSelect();
+  buildAgentModelSelect();
   fillSelect($("responseLang"), LANGUAGES.map((l) => [l, l]), settings.responseLang || "English");
   fillSelect($("improvePreset"), WRITING_PRESETS.map((p) => [p[0], p[1]]), settings.improvePreset || "improve");
   $("imageModel").value = settings.imageModel || "";
@@ -283,6 +310,7 @@ async function save() {
     webSearch: $("webSearch").checked,
     searchModel: $("searchModel").value,
     agentMode: $("agentMode").checked,
+    agentModel: $("agentModel").value,
     confirmActions: $("confirmActions").checked,
     blockPayments: $("blockPayments").checked,
     webmailAssist: $("webmailAssist").checked,
@@ -295,6 +323,7 @@ async function save() {
   modelLists = { ...(settings.modelLists || {}) };
   buildProviderFields();
   buildSearchModelSelect();
+  buildAgentModelSelect();
   refreshModelLists();
   flash($("status"), "✓ Enregistré.");
 }
@@ -356,6 +385,7 @@ browser.storage.onChanged.addListener((changes, area) => {
     buildProviderFields();
     buildImageProvider();
     buildSearchModelSelect();
+    buildAgentModelSelect();
     refreshModelLists();
   });
 });

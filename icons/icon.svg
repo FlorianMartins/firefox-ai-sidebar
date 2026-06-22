@@ -1,26 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
   <defs>
-    <linearGradient id="g" x1="12" y1="16" x2="84" y2="80" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#3b82f6"/>
-      <stop offset="0.55" stop-color="#7c3aed"/>
-      <stop offset="1" stop-color="#c026d3"/>
+    <linearGradient id="g" x1="14" y1="18" x2="82" y2="80" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4f8cff"/>
+      <stop offset="0.5" stop-color="#8b5cf6"/>
+      <stop offset="1" stop-color="#e040fb"/>
     </linearGradient>
   </defs>
-  <!-- Modern neural-network mark: layered nodes + connections, blue->violet
-       gradient, transparent background. Reads as "AI" without echoing Gemini. -->
-  <g stroke="url(#g)" stroke-width="3.2" stroke-linecap="round" opacity="0.9">
-    <line x1="21" y1="30" x2="48" y2="25"/>
-    <line x1="21" y1="30" x2="48" y2="71"/>
-    <line x1="21" y1="66" x2="48" y2="25"/>
-    <line x1="21" y1="66" x2="48" y2="71"/>
-    <line x1="48" y1="25" x2="77" y2="48"/>
-    <line x1="48" y1="71" x2="77" y2="48"/>
+  <!-- Bold neural-network mark: four outer nodes feeding one big hub. Thick strokes
+       and large filled nodes so it stays legible from afar / at favicon size.
+       Blue->violet->fuchsia gradient, transparent background. -->
+  <g stroke="url(#g)" stroke-width="5.5" stroke-linecap="round">
+    <line x1="24" y1="28" x2="50" y2="48"/>
+    <line x1="24" y1="68" x2="50" y2="48"/>
+    <line x1="76" y1="28" x2="50" y2="48"/>
+    <line x1="76" y1="68" x2="50" y2="48"/>
   </g>
   <g fill="url(#g)">
-    <circle cx="21" cy="30" r="7"/>
-    <circle cx="21" cy="66" r="7"/>
-    <circle cx="48" cy="25" r="7.5"/>
-    <circle cx="48" cy="71" r="7.5"/>
-    <circle cx="77" cy="48" r="9"/>
+    <circle cx="24" cy="28" r="9.5"/>
+    <circle cx="24" cy="68" r="9.5"/>
+    <circle cx="76" cy="28" r="9.5"/>
+    <circle cx="76" cy="68" r="9.5"/>
+    <circle cx="50" cy="48" r="14"/>
   </g>
 </svg>

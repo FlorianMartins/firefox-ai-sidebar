@@ -12,7 +12,7 @@ import { makeProvider, listModels, listOpenRouterRich, generateImage } from "../
 import { buildSystemPrompt, activeTools, runConversation } from "../lib/agent.js";
 import { executeTool } from "../lib/tools.js";
 import { configureMarkdown, renderMarkdown, enhanceArtifacts } from "../lib/markdown.js";
-import { PROVIDERS, modelFor, keyFor, connectedProviders, defaultSearchModel, WRITING_PRESETS } from "../lib/models.js";
+import { PROVIDERS, PROVIDER_ORDER, modelFor, keyFor, connectedProviders, defaultSearchModel, IMAGE_SIZES, WRITING_PRESETS } from "../lib/models.js";
 import { connectOpenRouter } from "../lib/auth.js";
 import {
   listConversations, getConversation, saveConversation, deleteConversation,
@@ -33,6 +33,7 @@ const els = {
   historyPanel: $("historyPanel"),
   historyList: $("historyList"),
   clearHistory: $("clearHistory"),
+  closeHistory: $("closeHistory"),
   pageBar: $("pageBar"),
   pageTitle: $("pageTitle"),
   tabsBtn: $("tabsBtn"),
@@ -108,6 +109,7 @@ async function init() {
   els.useTabs.checked = settings.includeSelectedTabs;
   els.translateLang.value = settings.targetLang || "Français";
   els.improvePreset.value = settings.improvePreset || "improve";
+  populateImageSizes();
   els.imageSize.value = settings.imageSize || "1024x1024";
   syncToggleVisibility();
   updateImageNote();
@@ -157,8 +159,36 @@ function orCost(m) {
   const inM = m.prompt * 1e6; // price per 1M prompt tokens
   return "$" + (inM >= 1 ? inM.toFixed(2) : inM.toFixed(3)) + "/M";
 }
+// Visual price tier for an OpenRouter model: a coloured dot (green → cheap, red →
+// expensive) + a gift for free models, so cost is readable at a glance. Emoji are
+// used (not CSS) because they render reliably inside native <option> dropdowns.
+function priceTier(m) {
+  if (!m.prompt && !m.completion) return { emoji: "🎁", color: "#34d399" }; // free
+  const inM = m.prompt * 1e6;
+  if (inM <= 1) return { emoji: "🟢", color: "#34d399" };   // pas cher
+  if (inM <= 5) return { emoji: "🟡", color: "#fbbf24" };   // abordable
+  if (inM <= 15) return { emoji: "🟠", color: "#fb923c" };  // modéré
+  return { emoji: "🔴", color: "#f87171" };                  // cher
+}
+function orOptionLabel(m) {
+  const t = priceTier(m);
+  return t.emoji + " " + prettifyORName(m) + " — " + orCost(m);
+}
 
-// OpenRouter hierarchy: one optgroup per vendor (OpenRouter › vendor › model+cost).
+// Display label for a "providerId|modelId" value (used for the "current model"
+// row that we pin at the top of the list — see fillModelSelect).
+function labelForValue(value) {
+  const { providerId, modelId } = parseSel(value);
+  if (providerId === "openrouter" && settings.orModels) {
+    const m = settings.orModels.find((x) => x.id === modelId);
+    if (m) return orOptionLabel(m);
+  }
+  const map = new Map(modelsOf(providerId));
+  return map.get(modelId) || modelId;
+}
+
+// OpenRouter hierarchy: one optgroup per vendor (OpenRouter › vendor › model+cost),
+// each option prefixed with a price-tier dot (🎁 for free).
 function fillOpenRouterGroups(sel) {
   const byVendor = {};
   for (const m of settings.orModels) {
@@ -171,7 +201,8 @@ function fillOpenRouterGroups(sel) {
     for (const m of byVendor[vendor].sort((a, b) => prettifyORName(a).localeCompare(prettifyORName(b)))) {
       const o = document.createElement("option");
       o.value = "openrouter|" + m.id;
-      o.textContent = prettifyORName(m) + " — " + orCost(m);
+      o.textContent = orOptionLabel(m);
+      o.style.color = priceTier(m).color;
       group.appendChild(o);
     }
     sel.appendChild(group);
@@ -184,6 +215,18 @@ function fillModelSelect(sel, selectedValue) {
   ph.value = "";
   ph.textContent = "— Choisir un modèle —";
   sel.appendChild(ph);
+  // Pin the active model as the FIRST entry so the native dropdown opens at the TOP
+  // showing it, instead of scrolling deep into a long list (the "list opens at the
+  // end" glitch). A duplicate value lower down is harmless.
+  if (selectedValue) {
+    const cur = document.createElement("optgroup");
+    cur.label = "✓ Modèle actuel";
+    const o = document.createElement("option");
+    o.value = selectedValue;
+    o.textContent = labelForValue(selectedValue);
+    cur.appendChild(o);
+    sel.appendChild(cur);
+  }
   for (const pid of providersToShow()) {
     if (pid === "openrouter" && settings.orModels && settings.orModels.length) {
       fillOpenRouterGroups(sel);
@@ -200,7 +243,54 @@ function fillModelSelect(sel, selectedValue) {
     }
     sel.appendChild(group);
   }
-  if (selectedValue) sel.value = selectedValue;
+  sel.value = selectedValue || "";
+}
+
+// ----- Image model picker (Image tab only) ----------------------------------
+// In the Image workspace the model dropdown lists ONLY image-generation models
+// (from providers that support /images/generations and are connected). Choosing
+// one sets the image provider + model used by runImage().
+function imageModelChoices() {
+  const out = [];
+  for (const pid of PROVIDER_ORDER) {
+    const meta = PROVIDERS[pid];
+    if (!meta.supportsImages || !meta.imageModels) continue;
+    if (currentKeyMissing(pid)) continue; // only connected providers
+    for (const [mid, mlabel] of meta.imageModels) out.push([pid, mid, mlabel]);
+  }
+  return out;
+}
+function populateImageModelSelector() {
+  const sel = els.modelSelect;
+  sel.innerHTML = "";
+  const list = imageModelChoices();
+  els.refreshModels.classList.remove("hidden");
+  els.modelWrap.classList.remove("hidden");
+  els.modelConnect.classList.toggle("hidden", list.length > 0);
+  if (!list.length) {
+    const o = document.createElement("option");
+    o.value = "";
+    o.textContent = "— Connectez un fournisseur d'images (ex. OpenAI) —";
+    sel.appendChild(o);
+    updateEmptyState();
+    return;
+  }
+  const cur = (settings.imageProvider || "openai") + "|" + (settings.imageModel || "");
+  for (const [pid, mid, mlabel] of list) {
+    const o = document.createElement("option");
+    o.value = pid + "|" + mid;
+    o.textContent = PROVIDERS[pid].label + " · " + mlabel;
+    sel.appendChild(o);
+  }
+  sel.value = cur;
+  if (!sel.value) sel.value = list[0][0] + "|" + list[0][1];
+  updateEmptyState();
+}
+
+// Refresh whichever model picker the active workspace needs.
+function refreshModelUI() {
+  if (mode === "image") populateImageModelSelector();
+  else populateModelSelector();
 }
 
 function populateModelSelector() {
@@ -227,7 +317,7 @@ function updateEmptyState() {
   els.emptyGreeting.classList.toggle("hidden", !connected);
   if (connected) {
     els.emptyGreeting.textContent =
-      mode === "terminal" ? "⌨ Terminal prêt — décrivez une tâche de code." : "Comment puis-je vous aider ?";
+      mode === "terminal" ? "</> Code prêt — décrivez une tâche de code." : "Comment puis-je vous aider ?";
   }
 }
 
@@ -257,6 +347,15 @@ function populateImprovePresets() {
     els.improvePreset.appendChild(o);
   }
 }
+function populateImageSizes() {
+  els.imageSize.innerHTML = "";
+  for (const [value, label] of IMAGE_SIZES) {
+    const o = document.createElement("option");
+    o.value = value;
+    o.textContent = label;
+    els.imageSize.appendChild(o);
+  }
+}
 
 // Apply a "providerId|modelId" choice from a picker. Provider + model are written
 // in ONE atomic storage write: two separate writes used to race the storage
@@ -272,6 +371,18 @@ async function applyModelChoice(value) {
 }
 
 async function onModelChange() {
+  // In the Image tab the picker selects an IMAGE model (provider + model used by
+  // runImage), not the chat model.
+  if (mode === "image") {
+    const sel = parseSel(els.modelSelect.value);
+    if (sel.providerId) {
+      settings.imageProvider = sel.providerId;
+      settings.imageModel = sel.modelId;
+      await setSettings({ imageProvider: sel.providerId, imageModel: sel.modelId });
+      updateImageNote();
+    }
+    return;
+  }
   await applyModelChoice(els.modelSelect.value);
   // Keep the Terminal picker in sync with the same choice.
   if (els.termModel) els.termModel.value = els.modelSelect.value;
@@ -324,7 +435,7 @@ async function autoListConnected() {
     })
   );
   await setSettings({ modelLists: settings.modelLists, orModels: settings.orModels || [] });
-  populateModelSelector();
+  refreshModelUI();
 }
 
 async function refreshModelsFromApi() {
@@ -349,6 +460,7 @@ function setMode(next) {
   document.body.classList.toggle("mode-terminal", next === "terminal");
   els.terminalView.classList.toggle("hidden", next !== "terminal");
   els.input.placeholder = PLACEHOLDERS[next] || PLACEHOLDERS.chat;
+  refreshModelUI(); // Image tab lists image models; others list chat models.
   if (next === "terminal") {
     termBoot();
     setTimeout(() => els.termInput.focus(), 0);
@@ -704,6 +816,7 @@ function wire() {
     startFreshChat(); // the open one is gone too — start clean
     renderHistoryList();
   });
+  els.closeHistory.addEventListener("click", () => els.historyPanel.classList.add("hidden"));
 
   els.tabsBtn.addEventListener("click", async () => {
     const show = els.tabsPanel.classList.contains("hidden");
@@ -760,7 +873,7 @@ function wire() {
     if (!connChanged && !changes.modelLists && !changes.orModels) return;
     settings = await getSettings();
     updateImageNote();
-    populateModelSelector();
+    refreshModelUI();
     if (connChanged) autoListConnected();
   });
 }
@@ -979,6 +1092,20 @@ async function sendToModel(displayText, modelContent, { forceWeb = false, runMod
       isolated = true;
       const lbl = PROVIDERS[ss.providerId] ? PROVIDERS[ss.providerId].label : ss.providerId;
       badge = "🌐 Recherche web · " + lbl + " · " + ss.modelId;
+    }
+  }
+
+  // Agent-model override: tool calling fails on many fast/free models (e.g. Llama),
+  // so the user can pin a tool-capable model for agent mode in Settings. The agent
+  // keeps the shared history (multi-turn tool loop), so it is NOT isolated.
+  if (agentMode && settings.agentModel) {
+    const as = parseSel(settings.agentModel);
+    if (as.providerId && !currentKeyMissing(as.providerId)) {
+      turnSel = as;
+      if (as.providerId !== sel.providerId || as.modelId !== sel.modelId) {
+        const lbl = PROVIDERS[as.providerId] ? PROVIDERS[as.providerId].label : as.providerId;
+        badge = "🤖 Agent · " + lbl + " · " + as.modelId;
+      }
     }
   }
 

@@ -40,6 +40,21 @@
       <div id="providers"></div>
 
       <section>
+        <h2>🤖 Mode agent</h2>
+        <p class="muted">
+          En mode <b>Agent</b>, l'IA pilote le navigateur via des <b>outils</b>
+          (ouvrir un onglet, cliquer, remplir, lire la page…). Beaucoup de modèles
+          rapides/gratuits (ex. <b>Llama</b>) ne savent pas appeler d'outils et le
+          mode agent reste alors inactif. Choisissez ici un modèle <b>capable
+          d'appeler des outils</b> (Claude, GPT-4o, DeepSeek, Gemini…). Laissez
+          <b>Auto</b> pour utiliser le modèle sélectionné dans la sidebar.
+        </p>
+        <label>Modèle de l'agent
+          <select id="agentModel"></select>
+        </label>
+      </section>
+
+      <section>
         <h2>🌐 Recherche web</h2>
         <p class="muted">
           En mode <b>Web</b>, la requête est envoyée à un modèle capable de chercher
@@ -64,7 +79,13 @@
         <label>Taille par défaut
           <select id="imageSize"></select>
         </label>
-        <p class="muted">Utilise l'endpoint compatible OpenAI <code>/images/generations</code>.</p>
+        <p class="muted">
+          Utilise l'endpoint compatible OpenAI <code>/images/generations</code>.
+          Les tailles dépendent du modèle (gpt-image-1 : 1024²/1536×1024/1024×1536 ·
+          DALL·E 3 : 1024²/1792×1024/1024×1792 · DALL·E 2 : 256²/512²/1024²). Le
+          <b>4K/1440p natif</b> n'est pas produit par ces modèles — générez en HD puis
+          agrandissez.
+        </p>
       </section>
 
       <section>
@@ -97,7 +118,7 @@
       <section>
         <h2>Comportement</h2>
         <label class="switch"><input type="checkbox" id="thinking" /><span class="track"></span><span class="lbl">Afficher le raisonnement du modèle (thinking)</span></label>
-        <label class="switch"><input type="checkbox" id="webSearch" /><span class="track"></span><span class="lbl">Recherche web (Claude uniquement)</span></label>
+        <label class="switch"><input type="checkbox" id="webSearch" /><span class="track"></span><span class="lbl">Recherche web activée par défaut (Perplexity / OpenRouter / Claude)</span></label>
         <label class="switch"><input type="checkbox" id="agentMode" /><span class="track"></span><span class="lbl">Activer le mode agent par défaut</span></label>
         <label class="switch"><input type="checkbox" id="includePageContext" /><span class="track"></span><span class="lbl">L'IA voit la page consultée (injection auto en mode chat)</span></label>
         <label class="switch"><input type="checkbox" id="autoReadPage" /><span class="track"></span><span class="lbl">Relire la page à chaque navigation (y compris sous-domaine)</span></label>

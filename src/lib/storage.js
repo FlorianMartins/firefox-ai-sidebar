@@ -27,6 +27,8 @@ const DEFAULTS = {
   webSearch: false, // web search: Anthropic native, OpenRouter "web" plugin, Perplexity Sonar
   searchModel: "", // "providerId|modelId" used in web-search mode ("" = auto-pick a free/online model)
   agentMode: false, // allow the model to act inside the browser
+  agentModel: "", // "providerId|modelId" forced for agent mode ("" = use the selected model). Many free
+                  // models (e.g. Llama) can't call tools — let the user pick a tool-capable model here.
   confirmActions: true, // ask before every state-changing action
   includePageContext: true, // feed the active page into the chat
   autoReadPage: true, // re-read the page on every navigation (subdomains too)
