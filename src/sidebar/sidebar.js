@@ -664,6 +664,14 @@ async function sendToModel(displayText, modelContent, { forceWeb = false, runMod
     addMessage("error", "Aucune clé pour ce modèle. Cliquez « Connexion / Ajouter un fournisseur » (⚙).");
     return;
   }
+  // Remember the last-used provider + model as the default for next time.
+  if (sel.providerId && sel.modelId) {
+    settings.provider = sel.providerId;
+    settings.models = settings.models || {};
+    settings.models[sel.providerId] = sel.modelId;
+    setSettings({ provider: sel.providerId });
+    setNested("models", sel.providerId, sel.modelId);
+  }
   addMessage("user", displayText);
   transcript.push({ role: "user", text: displayText });
   lastUserContent = modelContent;

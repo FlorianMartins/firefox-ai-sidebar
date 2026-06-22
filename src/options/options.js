@@ -12,6 +12,24 @@ const FREE_TIER = new Set(["google", "groq", "openrouter", "mistral", "cerebras"
 // own site to copy an API key).
 const OAUTH = new Set(["openrouter"]);
 
+// Direct sign-in (authentication) page for each provider, so "Se connecter"
+// opens the account login — not the raw API-keys page.
+const LOGIN_URL = {
+  anthropic: "https://console.anthropic.com/login",
+  openai: "https://auth.openai.com/log-in",
+  google: "https://aistudio.google.com/",
+  mistral: "https://console.mistral.ai/",
+  groq: "https://console.groq.com/login",
+  deepseek: "https://platform.deepseek.com/sign_in",
+  xai: "https://accounts.x.ai/sign-in",
+  perplexity: "https://www.perplexity.ai/settings/api",
+  together: "https://api.together.ai/signin",
+  fireworks: "https://fireworks.ai/login",
+  deepinfra: "https://deepinfra.com/login",
+  cerebras: "https://cloud.cerebras.ai/",
+  cohere: "https://dashboard.cohere.com/welcome/login",
+};
+
 let settings;
 let modelLists = {};
 
@@ -249,7 +267,7 @@ function flash(node, text) {
 // "Connect": OpenRouter via in-app OAuth; other providers open their own console
 // (the user logs in with their account there, creates a key, and pastes it).
 async function connectAccount(id) {
-  const status = $("connectStatus");
+  const status = $("status");
   if (OAUTH.has(id)) {
     status.textContent = "Connexion…";
     try {
@@ -265,16 +283,17 @@ async function connectAccount(id) {
     }
     return;
   }
-  // Non-OAuth: open the provider's account/console, then focus the key field.
+  // Non-OAuth: open the provider's LOGIN page directly (the user signs in with
+  // their account), then focus the key field for the key they create there.
   const meta = PROVIDERS[id];
-  if (meta.keysUrl) window.open(meta.keysUrl, "_blank", "noopener");
+  const url = LOGIN_URL[id] || meta.keysUrl;
+  if (url) window.open(url, "_blank", "noopener");
   const f = $(`key_${id}`);
   if (f) { f.focus(); f.scrollIntoView({ block: "center" }); }
-  flash(status, "Connectez-vous à " + meta.label + ", copiez votre clé, puis collez-la.");
+  flash(status, "Identifiez-vous chez " + meta.label + ", créez une clé API, puis collez-la.");
 }
 
 $("save").addEventListener("click", save);
-$("connectBtn").addEventListener("click", () => connectAccount("openrouter"));
 $("clearHistoryBtn").addEventListener("click", async () => {
   await clearConversations();
   flash($("status"), "✓ Historique effacé.");
