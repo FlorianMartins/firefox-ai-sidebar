@@ -44,7 +44,10 @@ button { cursor: pointer; }
   padding: 8px 10px; border-bottom: 1px solid var(--border-soft);
   background: var(--panel);
 }
-.brand { display: flex; align-items: center; gap: 8px; }
+.brand { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; border-radius: 8px; padding: 2px 4px; margin: -2px -4px; transition: background 0.15s; }
+.brand:hover { background: var(--panel-2); }
+/* Tabs rail hidden via the brand toggle. */
+body.rail-collapsed #rail { display: none; }
 .brand-logo { width: 22px; height: 22px; border-radius: 7px; }
 .brand-name {
   font-weight: 700; font-size: 14px; letter-spacing: -0.2px;

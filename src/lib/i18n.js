@@ -26,6 +26,7 @@ const EN = {
   "tabs.use": "Use the ticked tabs",
   "refresh.title": "Refresh",
   "expand.title": "Open in a full-screen tab",
+  "brand.toggle": "Show / hide the tabs menu",
 
   // ----- Attachments + voice -------------------------------------------------
   "attach.title": "Attach files or images (used as context)",
@@ -395,6 +396,7 @@ const FR = {
   "tabs.use": "Utiliser les onglets cochés",
   "refresh.title": "Rafraîchir",
   "expand.title": "Ouvrir en plein écran (nouvel onglet)",
+  "brand.toggle": "Afficher / masquer le menu d'onglets",
 
   // ----- Pièces jointes + voix -----------------------------------------------
   "attach.title": "Joindre des fichiers ou images (utilisés comme contexte)",

@@ -48,6 +48,7 @@ const DEFAULTS = {
   uiLang: "en", // sidebar interface language: "en" (default) | "fr". Changed from Settings.
   railSide: "left", // workspace tab rail position INSIDE the sidebar: "left" (default) | "right".
                     // (The sidebar's own browser-side position is not controllable by extensions.)
+  railHidden: false, // hide the workspace tabs rail entirely (toggled by clicking the brand/logo).
 
   // ----- Model picker filter (price tiers + providers) -----------------------
   // Persisted state of the model-filter popover shared by every workspace's picker.

@@ -30,6 +30,7 @@ const els = {
   modelWrap: $("modelWrap"),
   modelConnect: $("modelConnect"),
   expandTab: $("expandTab"),
+  brand: $("brandToggle"),
   attachBtn: $("attachBtn"),
   attachInput: $("attachInput"),
   attachStrip: $("attachStrip"),
@@ -83,7 +84,6 @@ const els = {
   translateLang: $("translateLang"),
   improvePreset: $("improvePreset"),
   imageSize: $("imageSize"),
-  imageProviderNote: $("imageProviderNote"),
   confirmBar: $("confirmBar"),
   confirmText: $("confirmText"),
   confirmAllow: $("confirmAllow"),
@@ -192,6 +192,7 @@ async function init() {
   applyDom(document);                  // fill all data-i18n static markup
   document.documentElement.lang = settings.uiLang === "fr" ? "fr" : "en";
   document.body.classList.toggle("rail-right", settings.railSide === "right");
+  document.body.classList.toggle("rail-collapsed", !!settings.railHidden);
   populateModelSelector();
   populateImprovePresets();
   els.thinking.checked = settings.thinking;
@@ -540,8 +541,8 @@ function syncToggleVisibility() {
   // in case provider-specific UI tweaks are needed later.
 }
 function updateImageNote() {
-  const meta = PROVIDERS[settings.imageProvider || "openai"];
-  els.imageProviderNote.textContent = meta ? "via " + meta.label : "";
+  // The "via <provider>" note was removed from the Image tab UI. Kept as a no-op so
+  // existing call sites stay valid.
 }
 function populateImprovePresets() {
   els.improvePreset.innerHTML = "";
@@ -968,6 +969,13 @@ function buildUserContent(text, imgs, providerId) {
   return parts;
 }
 
+// Clicking the brand (logo / "AI Sidebar") shows/hides the workspace tabs rail.
+function toggleRail() {
+  settings.railHidden = !settings.railHidden;
+  document.body.classList.toggle("rail-collapsed", settings.railHidden);
+  setSettings({ railHidden: settings.railHidden });
+}
+
 // ----- Open in a full-screen tab --------------------------------------------
 function openInTab() {
   const url = browser.runtime.getURL("src/sidebar/sidebar.html") + "?tab=1";
@@ -1332,6 +1340,10 @@ function wire() {
   if (IS_TAB) els.expandTab.hidden = true;
   else els.expandTab.addEventListener("click", openInTab);
 
+  // Click the brand/logo to show or hide the workspace tabs rail.
+  els.brand.addEventListener("click", toggleRail);
+  els.brand.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleRail(); } });
+
   // Composer: attachments (+).
   els.attachBtn.addEventListener("click", () => els.attachInput.click());
   els.attachInput.addEventListener("change", async (e) => {
@@ -1438,6 +1450,7 @@ function wire() {
     // rebuilt in the new language (simplest and fully consistent).
     if (changes.uiLang) { location.reload(); return; }
     if (changes.railSide) document.body.classList.toggle("rail-right", changes.railSide.newValue === "right");
+    if (changes.railHidden) document.body.classList.toggle("rail-collapsed", !!changes.railHidden.newValue);
     const connChanged = !!(changes.keys || changes.baseUrls || changes.localEnabled);
     if (!connChanged && !changes.modelLists && !changes.orModels && !changes.codeAppUrl && !changes.orFreeOnly) return;
     settings = await getSettings();

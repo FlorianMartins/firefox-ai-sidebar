@@ -9,7 +9,7 @@
   <body>
     <!-- Top bar: brand + global actions -->
     <header class="topbar">
-      <div class="brand">
+      <div class="brand" id="brandToggle" role="button" tabindex="0" data-i18n-title="brand.toggle" title="Show / hide the tabs menu">
         <img src="../../icons/icon.svg" alt="" class="brand-logo" />
         <span class="brand-name">AI Sidebar</span>
       </div>
@@ -159,7 +159,6 @@
             <option value="Russian" data-i18n="lang.Russian">Russian</option>
           </select>
         </label>
-        <span class="muted" data-i18n="translate.empty">empty = the page</span>
       </div>
 
       <div class="ctl-group hidden" id="improveControls">
@@ -172,7 +171,6 @@
         <label><span data-i18n="image.size">Size</span>
           <select id="imageSize" data-i18n-title="image.sizeTitle" title="Sizes depend on the model. Native 4K/1440p doesn't exist on current image models — upscale the image afterwards."></select>
         </label>
-        <span class="muted" id="imageProviderNote"></span>
       </div>
 
       <div class="ctl-group hidden" id="pdfControls">
