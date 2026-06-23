@@ -56,6 +56,7 @@
         <button class="railtab" data-mode="translate" data-i18n-title="rail.translateTitle" title="Translate"><span class="ri">🌐</span><span class="rl" data-i18n="rail.translate">Translate</span></button>
         <button class="railtab" data-mode="improve" data-i18n-title="rail.improveTitle" title="Improve a text"><span class="ri">✨</span><span class="rl" data-i18n="rail.improve">Improve</span></button>
         <button class="railtab" data-mode="image" data-i18n-title="rail.imageTitle" title="Generate an image"><span class="ri">🎨</span><span class="rl" data-i18n="rail.image">Image</span></button>
+        <button class="railtab" data-mode="pdf" data-i18n-title="rail.pdfTitle" title="Read a PDF and ask questions"><span class="ri">📄</span><span class="rl" data-i18n="rail.pdf">PDF</span></button>
         <button class="railtab" data-mode="terminal" data-i18n-title="rail.terminalTitle" title="Terminal (command-line code agent)"><span class="ri">⌨️</span><span class="rl" data-i18n="rail.terminal">Terminal</span></button>
         <button class="railtab" data-mode="code" data-i18n-title="rail.codeTitle" title="AI code workshop (preview, Expo Go…)"><span class="ri">&lt;/&gt;</span><span class="rl" data-i18n="rail.code">Code</span></button>
       </nav>
@@ -189,6 +190,15 @@
         </label>
         <span class="muted" id="imageProviderNote"></span>
       </div>
+
+      <div class="ctl-group hidden" id="pdfControls">
+        <button id="pdfLoad" class="chip" data-i18n="pdf.load" data-i18n-title="pdf.loadTitle" title="Choose a PDF file to read">📄 Load PDF</button>
+        <input type="file" id="pdfFile" accept="application/pdf,.pdf" hidden />
+        <span class="muted" id="pdfInfo"></span>
+        <button id="pdfSummarize" class="chip hidden" data-i18n="pdf.summarize">📝 Summarize</button>
+        <button id="pdfImages" class="chip hidden" data-i18n="pdf.images">🖼 Page images</button>
+        <button id="pdfText" class="chip hidden" data-i18n="pdf.text">📄 Extract text</button>
+      </div>
     </div>
 
     <!-- Model picker (API mode): just above the chat input. Hidden in site mode. -->
@@ -212,6 +222,8 @@
     <script src="../../vendor/browser-polyfill.min.js"></script>
     <script src="../../vendor/marked.min.js"></script>
     <script src="../../vendor/purify.min.js"></script>
+    <!-- pdf.js (Mozilla) for the PDF workspace: text + page-image extraction. -->
+    <script src="../../vendor/pdf.min.js"></script>
     <script type="module" src="sidebar.js"></script>
   </body>
 </html>

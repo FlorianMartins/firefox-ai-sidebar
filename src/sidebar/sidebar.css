@@ -266,6 +266,11 @@ button { cursor: pointer; }
   color: var(--text); background: var(--grad-soft); border-color: rgba(139, 92, 246, 0.6);
 }
 
+/* ----- PDF workspace controls ----- */
+#pdfControls { gap: 6px; flex-wrap: wrap; }
+#pdfControls .chip { flex: 0 0 auto; padding: 6px 10px; }
+#pdfInfo { font-size: 11.5px; flex: 1 1 100%; color: var(--muted); }
+
 /* ----- Composer ----- */
 .composer {
   display: flex; gap: 8px; align-items: flex-end; padding: 10px;

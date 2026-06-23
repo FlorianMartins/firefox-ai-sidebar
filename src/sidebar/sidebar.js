@@ -61,6 +61,13 @@ const els = {
   translateControls: $("translateControls"),
   improveControls: $("improveControls"),
   imageControls: $("imageControls"),
+  pdfControls: $("pdfControls"),
+  pdfLoad: $("pdfLoad"),
+  pdfFile: $("pdfFile"),
+  pdfInfo: $("pdfInfo"),
+  pdfSummarize: $("pdfSummarize"),
+  pdfImages: $("pdfImages"),
+  pdfText: $("pdfText"),
   thinking: $("thinking"),
   webSearch: $("webSearch"),
   pageCtx: $("pageCtx"),
@@ -86,6 +93,12 @@ let mode = "chat";
 // gated, no free endpoint). Session-only: removed from the picker as we hit them, and
 // reset on reload — so after fixing the account they all come back.
 const orUnavailable = new Set();
+
+// PDF workspace state: the loaded document + its extracted text (used as context).
+let pdfDoc = null;
+let pdf = { name: "", text: "", pages: 0 };
+let pdfWorkerSet = false;
+const PDF_BUDGET = 24000; // chars of PDF text passed to the model as supporting context
 // Last primary turn (to re-run on another model for the "compare" button).
 let lastUserContent = "";
 let lastRunMode = "chat";
@@ -100,7 +113,7 @@ const term = { native: [], lines: [], cmds: [], cmdIdx: 0, booted: false };
 // are distinct). Terminal and Code have dedicated panes and are not chat-area
 // modes. We swap the live globals (history/transcript/convId/…) in and out of a
 // per-mode session whenever the workspace changes.
-const CHAT_MODES = ["chat", "agent", "translate", "improve", "image"];
+const CHAT_MODES = ["chat", "agent", "translate", "improve", "image", "pdf"];
 const sessions = {}; // mode -> { history, transcript, convId, lastUserContent, lastRunMode, lastForceWeb }
 function blankSession(m) {
   return { history: [], transcript: [], convId: newConversationId(), lastUserContent: "", lastRunMode: m, lastForceWeb: false, nodes: null };
@@ -432,6 +445,7 @@ function updateEmptyState() {
     els.emptyGreeting.textContent =
       mode === "terminal" ? t("greeting.terminal") :
       mode === "agent" ? t("greeting.agent") :
+      mode === "pdf" ? t("greeting.pdf") :
       t("greeting");
   }
 }
@@ -606,6 +620,7 @@ function setMode(next) {
   els.translateControls.classList.toggle("hidden", next !== "translate");
   els.improveControls.classList.toggle("hidden", next !== "improve");
   els.imageControls.classList.toggle("hidden", next !== "image");
+  els.pdfControls.classList.toggle("hidden", next !== "pdf");
   document.body.classList.toggle("mode-terminal", next === "terminal");
   document.body.classList.toggle("mode-code", next === "code");
   els.terminalView.classList.toggle("hidden", next !== "terminal");
@@ -995,6 +1010,17 @@ function wire() {
 
   els.rail.querySelectorAll(".railtab").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
   els.openCodeApp.addEventListener("click", openCodeApp);
+
+  // PDF workspace controls
+  els.pdfLoad.addEventListener("click", () => els.pdfFile.click());
+  els.pdfFile.addEventListener("change", (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (f) loadPdfFile(f);
+    e.target.value = ""; // allow re-loading the same file
+  });
+  els.pdfSummarize.addEventListener("click", pdfSummarizeAction);
+  els.pdfImages.addEventListener("click", pdfExtractImages);
+  els.pdfText.addEventListener("click", pdfExtractTextAction);
 
   els.translateLang.addEventListener("change", async () => {
     settings.targetLang = els.translateLang.value;
@@ -1422,6 +1448,7 @@ async function onSend() {
   if (mode === "translate") return runTranslateFromInput();
   if (mode === "improve") return runImproveFromInput();
   if (mode === "image") return runImageFromInput();
+  if (mode === "pdf") return onPdfSend();
   if (mode === "terminal") return onTerminalSend();
   if (mode === "code") return; // Code workspace has no composer — use the launcher button.
   return onChatSend(); // chat + agent
@@ -1622,6 +1649,90 @@ async function compareImage(second, btn) {
     endBusy();
     btn.disabled = false;
     await saveCurrent();
+  }
+}
+
+// ----- PDF workspace --------------------------------------------------------
+function pdfContextBlock() {
+  if (!pdf.text) return "";
+  return `[PDF: ${pdf.name} (${pdf.pages} pages)]\n${pdf.text.slice(0, PDF_BUDGET)}\n\n`;
+}
+async function loadPdfFile(file) {
+  if (!file) return;
+  if (!window.pdfjsLib) { addMessage("error", t("err.pdf", { msg: "pdf.js not loaded" })); return; }
+  els.pdfInfo.textContent = t("pdf.loading");
+  try {
+    if (!pdfWorkerSet) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = browser.runtime.getURL("vendor/pdf.worker.min.js");
+      pdfWorkerSet = true;
+    }
+    const buf = await file.arrayBuffer();
+    const doc = await window.pdfjsLib.getDocument({ data: buf }).promise;
+    let text = "";
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map((it) => (it.str || "")).join(" ") + "\n\n";
+    }
+    pdfDoc = doc;
+    pdf = { name: file.name, text: text.trim(), pages: doc.numPages };
+    els.pdfInfo.textContent = t("pdf.info", { name: file.name, pages: doc.numPages });
+    els.pdfSummarize.classList.remove("hidden");
+    els.pdfImages.classList.remove("hidden");
+    els.pdfText.classList.remove("hidden");
+    addMessage("tool", t("pdf.loaded", { name: file.name, pages: doc.numPages }));
+    els.input.focus();
+  } catch (e) {
+    els.pdfInfo.textContent = "";
+    addMessage("error", t("err.pdf", { msg: e && e.message ? e.message : String(e) }));
+  }
+}
+async function onPdfSend() {
+  const text = els.input.value.trim();
+  if (!text) return;
+  if (!pdf.text) return addMessage("error", t("pdf.none"));
+  els.input.value = "";
+  await sendToModel(text, pdfContextBlock() + `[Question]\n${text}`, { runMode: "chat" });
+}
+async function pdfSummarizeAction() {
+  if (!pdf.text) return addMessage("error", t("pdf.none"));
+  await sendToModel(t("pdf.summLabel"), pdfContextBlock() + "[Task]\n" + t("pdf.summPrompt"), { runMode: "chat" });
+}
+function pdfExtractTextAction() {
+  if (!pdf.text) return addMessage("error", t("pdf.none"));
+  addMessage("user", t("pdf.textLabel"));
+  const el = addMessage("assistant", "");
+  el.innerHTML = renderMarkdown("```text\n" + pdf.text.slice(0, 100000) + "\n```");
+  enhanceArtifacts(el);
+}
+async function pdfExtractImages() {
+  if (!pdfDoc) return addMessage("error", t("pdf.none"));
+  if (busy) return;
+  addMessage("user", t("pdf.imagesLabel"));
+  const status = addMessage("tool", t("pdf.extracting"));
+  startBusy();
+  try {
+    const wrap = addMessage("assistant", "");
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+      const page = await pdfDoc.getPage(i);
+      const viewport = page.getViewport({ scale: 1.5 });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+      const img = document.createElement("img");
+      img.src = canvas.toDataURL("image/png");
+      img.alt = `page ${i}`;
+      img.className = "gen-image";
+      wrap.appendChild(img);
+      els.messages.scrollTop = els.messages.scrollHeight;
+    }
+    status.remove();
+  } catch (e) {
+    status.remove();
+    addMessage("error", t("err.pdf", { msg: e && e.message ? e.message : String(e) }));
+  } finally {
+    endBusy();
   }
 }
 
