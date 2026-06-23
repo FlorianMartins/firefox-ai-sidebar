@@ -177,12 +177,78 @@
     return { ok: true };
   }
 
+  // --- Element picker ------------------------------------------------------
+  // Lets the user point at any element on the page (a table, an image, a menu…)
+  // and "ask the AI about it". On hover we outline the element; on click we return
+  // its text + bounding rect (the sidebar then crops a screenshot of it). Esc cancels.
+  let pickResolve = null;
+  let pickOverlay = null;
+  let pickHover = null;
+  function pickMove(e) {
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el || el === pickOverlay) return;
+    pickHover = el;
+    const r = el.getBoundingClientRect();
+    Object.assign(pickOverlay.style, {
+      top: r.top + "px", left: r.left + "px", width: r.width + "px", height: r.height + "px",
+    });
+  }
+  function pickKey(e) {
+    if (e.key === "Escape") { e.preventDefault(); endPick(null); }
+  }
+  function pickClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    endPick(pickHover || document.elementFromPoint(e.clientX, e.clientY));
+  }
+  function describeElement(el) {
+    try { el.scrollIntoView({ block: "center", inline: "center" }); } catch (_) {}
+    const rect = el.getBoundingClientRect();
+    const text = (el.innerText || el.textContent || "").replace(/\n{3,}/g, "\n\n").trim().slice(0, 8000);
+    let imgSrc = "";
+    if (el.tagName === "IMG") imgSrc = el.currentSrc || el.src || "";
+    return {
+      tag: el.tagName.toLowerCase(), text, imgSrc,
+      rect: { x: rect.left, y: rect.top, w: rect.width, h: rect.height },
+      dpr: window.devicePixelRatio || 1, url: location.href, title: document.title,
+    };
+  }
+  function endPick(el) {
+    document.removeEventListener("mousemove", pickMove, true);
+    document.removeEventListener("click", pickClick, true);
+    document.removeEventListener("keydown", pickKey, true);
+    document.documentElement.style.cursor = "";
+    if (pickOverlay) { pickOverlay.remove(); pickOverlay = null; }
+    const r = pickResolve; pickResolve = null;
+    const out = el ? describeElement(el) : { cancelled: true };
+    r && r(out);
+  }
+  function startPick() {
+    if (pickResolve) endPick(null); // restart cleanly
+    return new Promise((resolve) => {
+      pickResolve = resolve;
+      pickOverlay = document.createElement("div");
+      Object.assign(pickOverlay.style, {
+        position: "fixed", zIndex: 2147483647, top: 0, left: 0, width: 0, height: 0,
+        border: "2px solid #8b5cf6", background: "rgba(139,92,246,.18)", borderRadius: "3px",
+        pointerEvents: "none", boxShadow: "0 0 0 9999px rgba(0,0,0,.06)",
+      });
+      document.documentElement.appendChild(pickOverlay);
+      document.documentElement.style.cursor = "crosshair";
+      document.addEventListener("mousemove", pickMove, true);
+      document.addEventListener("click", pickClick, true);
+      document.addEventListener("keydown", pickKey, true);
+    });
+  }
+
   browser.runtime.onMessage.addListener((msg) => {
     switch (msg && msg.type) {
       case "read_page":
         return Promise.resolve(readPage());
       case "read_selection":
         return Promise.resolve(readSelection());
+      case "pick_element":
+        return startPick();
       case "find_elements":
         return Promise.resolve(findElements(msg.query));
       case "click_element":

@@ -369,6 +369,31 @@ export async function listModels(providerId, settings) {
     .sort();
 }
 
+// -------- Audio transcription (Whisper-style /audio/transcriptions) ----------
+// Powers the composer's voice-dictation fallback when the browser has no Web Speech
+// API (e.g. Firefox). Posts the recorded audio to a connected OpenAI- or Groq-
+// compatible endpoint and returns the recognised text. 100% BYOK — uses the user's
+// own key and goes straight to the provider they chose.
+export async function transcribeAudio(settings, blob) {
+  const providerId = settings.provider;
+  const meta = PROVIDERS[providerId];
+  if (!meta) throw new Error("No transcription provider connected.");
+  const baseUrl = baseUrlFor(providerId, settings);
+  const apiKey = keyFor(providerId, settings);
+  if (meta.needsKey && !apiKey) throw new Error(`API key missing for ${meta.label}.`);
+  const model = providerId === "groq" ? "whisper-large-v3" : "whisper-1";
+  const ext = (blob.type || "").includes("ogg") ? "ogg" : (blob.type || "").includes("mp4") ? "mp4" : "webm";
+  const fd = new FormData();
+  fd.append("file", blob, `audio.${ext}`);
+  fd.append("model", model);
+  const headers = {};
+  if (apiKey) headers.authorization = `Bearer ${apiKey}`;
+  const res = await fetch(baseUrl.replace(/\/$/, "") + "/audio/transcriptions", { method: "POST", headers, body: fd });
+  await ensureOk(res);
+  const json = await res.json();
+  return (json && (json.text || (json.results && json.results[0] && json.results[0].text))) || "";
+}
+
 // -------- Image generation (OpenAI-compatible /images/generations) ----------
 // Returns a list of data: (or http) URLs to display.
 export async function generateImage(settings, { prompt, size, signal }) {

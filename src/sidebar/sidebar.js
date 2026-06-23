@@ -21,10 +21,26 @@ import {
 } from "../lib/history.js";
 
 const $ = (id) => document.getElementById(id);
+// Are we running as a standalone full-screen TAB (vs the docked sidebar)? The
+// "open in a tab" button appends ?tab=1; we hide that button when already in a tab.
+const IS_TAB = new URLSearchParams(location.search).get("tab") === "1";
 const els = {
-  modelSelect: $("modelSelect"),
+  modelInput: $("modelInput"),
+  modelMenu: $("modelMenu"),
   modelWrap: $("modelWrap"),
   modelConnect: $("modelConnect"),
+  expandTab: $("expandTab"),
+  attachBtn: $("attachBtn"),
+  attachInput: $("attachInput"),
+  attachStrip: $("attachStrip"),
+  modelFilterBtn: $("modelFilterBtn"),
+  modelFilterPanel: $("modelFilterPanel"),
+  filterProviders: $("filterProviders"),
+  filterReset: $("filterReset"),
+  filterClose: $("filterClose"),
+  termFilterBtn: $("termFilterBtn"),
+  termModelInput: $("termModelInput"),
+  termModelMenu: $("termModelMenu"),
   freeConnect: $("freeConnect"),
   emptyOptions: $("emptyOptions"),
   historyBtn: $("historyBtn"),
@@ -36,6 +52,7 @@ const els = {
   closeHistory: $("closeHistory"),
   pageBar: $("pageBar"),
   pageTitle: $("pageTitle"),
+  pickEl: $("pickEl"),
   tabsBtn: $("tabsBtn"),
   tabsPanel: $("tabsPanel"),
   tabsList: $("tabsList"),
@@ -55,7 +72,6 @@ const els = {
   terminalView: $("terminalView"),
   termLog: $("termLog"),
   termInput: $("termInput"),
-  termModel: $("termModel"),
   termClear: $("termClear"),
   chatControls: $("chatControls"),
   translateControls: $("translateControls"),
@@ -107,6 +123,24 @@ let lastForceWeb = false;
 // Terminal workspace (OpenClaude): its own native message history + persisted
 // scrollback, independent from the chat. `cmds`/`cmdIdx` drive ↑/↓ recall.
 const term = { native: [], lines: [], cmds: [], cmdIdx: 0, booted: false };
+
+// Composer attachments (files/images the AI gets as context). Transient — bound to
+// the next message, cleared after a send or when switching workspace. Each entry:
+//   image: { type:"image", name, dataUrl, mediaType }
+//   text : { type:"text",  name, text, isPdf?, pages? }
+let attachments = [];
+const ATT_IMG_MAX_MB = 10;   // an image bigger than this is rejected (base64 bloat / API limits)
+const ATT_TXT_MAX_MB = 25;   // a text/PDF file bigger than this is rejected
+const ATT_TXT_BUDGET = 16000; // chars of EACH attached text file folded into the prompt
+
+// Searchable model comboboxes (main picker + terminal picker). `mainValue` /
+// `termValue` hold the selected "providerId|modelId"; the combo objects render the
+// floating, type-to-filter lists. The price/provider filter persists in settings.
+let mainValue = "";
+let termValue = "";
+let mainCombo = null;
+let termCombo = null;
+let filterPersistTimer = null;
 
 // Per-workspace isolation: Chat, Agent, Translate, Improve and Image each keep
 // their OWN live conversation AND their own saved-conversation history (the two
@@ -242,6 +276,21 @@ function orOptionLabel(m) {
   const t = priceTier(m);
   return t.emoji + " " + prettifyORName(m) + " — " + orCost(m);
 }
+// Canonical price-tier NAME (free/green/yellow/orange/red) for the filter — mirrors
+// priceTier()'s thresholds. Used as data-tier on each <option>.
+function priceTierName(m) {
+  if (!m.prompt && !m.completion) return "free";
+  const inM = m.prompt * 1e6;
+  if (inM <= 1) return "green";
+  if (inM <= 5) return "yellow";
+  if (inM <= 15) return "orange";
+  return "red";
+}
+// Stamp an <option> with the attributes the filter reads (provider / tier / free).
+function tagOption(o, provider, tier) {
+  o.dataset.provider = provider;
+  if (tier) { o.dataset.tier = tier; o.dataset.free = tier === "free" ? "true" : "false"; }
+}
 
 // Display label for a "providerId|modelId" value (used for the "current model"
 // row that we pin at the top of the list — see fillModelSelect).
@@ -277,6 +326,8 @@ function fillOpenRouterGroups(sel) {
       o.value = "openrouter|" + m.id;
       o.textContent = orOptionLabel(m);
       o.style.color = priceTier(m).color;
+      tagOption(o, "openrouter", priceTierName(m));
+      o.dataset.subprovider = vendor;
       group.appendChild(o);
     }
     sel.appendChild(group);
@@ -313,6 +364,7 @@ function fillModelSelect(sel, selectedValue) {
       const o = document.createElement("option");
       o.value = pid + "|" + mid;
       o.textContent = mlabel;
+      tagOption(o, pid, null); // no per-token pricing for non-OpenRouter providers
       group.appendChild(o);
     }
     sel.appendChild(group);
@@ -343,47 +395,49 @@ function imageModelChoices() {
   }
   return out;
 }
+// Map an image tier emoji to a filter tier name (so price filtering works here too).
+function imageTierName(emoji) {
+  return emoji === "🎁" ? "free" : emoji === "🟢" ? "green" : emoji === "🟡" ? "yellow"
+    : emoji === "🟠" ? "orange" : emoji === "🔴" ? "red" : null;
+}
+// Combobox items for the Image tab.
+function imageComboItems() {
+  const out = [];
+  for (const [pid, mid, mlabel] of imageModelChoices()) {
+    const tier = imagePriceTier(pid, mid);
+    out.push({
+      value: pid + "|" + mid,
+      label: tier.emoji + " " + PROVIDERS[pid].label + " · " + mlabel + " — " + tier.note,
+      provider: pid, subprovider: null, tier: imageTierName(tier.emoji), color: tier.color,
+      group: PROVIDERS[pid].label,
+    });
+  }
+  return out;
+}
 function populateImageModelSelector() {
-  const sel = els.modelSelect;
-  sel.innerHTML = "";
   const list = imageModelChoices();
-  // Same rule as the chat picker: with NOTHING connected, hide the list and show
-  // only the full-width Connect button. With a provider connected, show the list.
   const anyConnected = connectedProviders(settings).length > 0;
-  els.modelWrap.classList.toggle("hidden", !anyConnected);
-  els.modelConnect.classList.toggle("hidden", anyConnected || list.length > 0);
-  if (!list.length) {
-    const o = document.createElement("option");
-    o.value = "";
-    o.textContent = anyConnected
-      ? t("image.connectOpenAI")
-      : t("image.connectAny");
-    sel.appendChild(o);
-    updateEmptyState();
-    return;
-  }
+  els.modelWrap.classList.toggle("hidden", !anyConnected || !list.length);
+  els.modelConnect.classList.toggle("hidden", anyConnected && list.length > 0);
+  els.modelFilterBtn.classList.toggle("hidden", !anyConnected || !list.length);
   const cur = (settings.imageProvider || "openai") + "|" + (settings.imageModel || "");
-  for (const [pid, mid, mlabel] of list) {
-    const o = document.createElement("option");
-    const t = imagePriceTier(pid, mid); // P6: price colour code in the image list too
-    o.value = pid + "|" + mid;
-    o.textContent = t.emoji + " " + PROVIDERS[pid].label + " · " + mlabel + " — " + t.note;
-    o.style.color = t.color;
-    sel.appendChild(o);
-  }
-  sel.value = cur;
-  // If the stored image provider/model isn't among the CONNECTED image models
-  // (e.g. default is OpenAI but the user only connected OpenRouter), fall back to
-  // the first available one AND persist it, so "Generate" doesn't fail with a
-  // "key missing for OpenAI" against an unselected provider.
-  if (!sel.value) {
-    sel.value = list[0][0] + "|" + list[0][1];
-    const fb = parseSel(sel.value);
+  const exists = list.some(([pid, mid]) => pid + "|" + mid === cur);
+  if (exists) {
+    mainValue = cur;
+  } else if (list.length) {
+    // Stored image model not among CONNECTED ones (e.g. default OpenAI but only
+    // OpenRouter connected) → fall back to the first available and persist it.
+    mainValue = list[0][0] + "|" + list[0][1];
+    const fb = parseSel(mainValue);
     settings.imageProvider = fb.providerId;
     settings.imageModel = fb.modelId;
     setSettings({ imageProvider: fb.providerId, imageModel: fb.modelId });
     updateImageNote();
+  } else {
+    mainValue = "";
   }
+  if (mainCombo) mainCombo.refresh();
+  els.modelFilterBtn.classList.toggle("active", filterIsActive());
   updateEmptyState();
 }
 
@@ -416,21 +470,54 @@ function refreshModelUI() {
   else populateModelSelector();
 }
 
+// Combobox items for the chat-style pickers (Chat/Agent/Translate/Improve/PDF +
+// Terminal). OpenRouter models are grouped by vendor so the list — and the vendor
+// sub-filter — stay readable.
+function chatComboItems() {
+  const out = [];
+  for (const pid of providersToShow()) {
+    if (pid === "openrouter" && settings.orModels && settings.orModels.length) {
+      const byVendor = {};
+      for (const m of settings.orModels) {
+        if (orUnavailable.has(m.id)) continue;
+        const vendor = m.id.split("/")[0] || "other";
+        (byVendor[vendor] = byVendor[vendor] || []).push(m);
+      }
+      for (const vendor of Object.keys(byVendor).sort()) {
+        for (const m of byVendor[vendor].sort((a, b) => prettifyORName(a).localeCompare(prettifyORName(b)))) {
+          out.push({
+            value: "openrouter|" + m.id, label: orOptionLabel(m), provider: "openrouter",
+            subprovider: vendor, tier: priceTierName(m), color: priceTier(m).color,
+            group: "OpenRouter · " + prettifyVendor(vendor),
+          });
+        }
+      }
+      continue;
+    }
+    for (const [mid, mlabel] of modelsOf(pid)) {
+      out.push({ value: pid + "|" + mid, label: mlabel, provider: pid, subprovider: null, tier: null, color: null, group: PROVIDERS[pid].label });
+    }
+  }
+  return out;
+}
 function populateModelSelector() {
   const connected = connectedProviders(settings);
   const none = connected.length === 0;
-  // Nothing connected yet → hide the model list entirely and show ONLY the
-  // full-width "Connect a provider" button. Once at least one provider is
-  // connected, show the (full-width) model list and hide the button. (All tabs.)
+  // Nothing connected yet → hide the picker and show ONLY the full-width "Connect a
+  // provider" button. Once a provider is connected, show the searchable combobox.
   els.modelConnect.classList.toggle("hidden", !none);
   els.modelWrap.classList.toggle("hidden", none);
-  let val = "";
+  els.modelFilterBtn.classList.toggle("hidden", none);
   if (connected.length) {
     const pid = connected.includes(settings.provider) ? settings.provider : connected[0];
-    val = pid + "|" + modelFor(pid, settings);
+    mainValue = pid + "|" + modelFor(pid, settings);
+    if (!termValue) termValue = mainValue;
+  } else {
+    mainValue = "";
   }
-  fillModelSelect(els.modelSelect, val);
-  if (els.termModel) fillModelSelect(els.termModel, val);
+  if (mainCombo) mainCombo.refresh();
+  if (termCombo) termCombo.refresh();
+  els.modelFilterBtn.classList.toggle("active", filterIsActive());
   updateEmptyState();
 }
 
@@ -446,6 +533,9 @@ function updateEmptyState() {
       mode === "terminal" ? t("greeting.terminal") :
       mode === "agent" ? t("greeting.agent") :
       mode === "pdf" ? t("greeting.pdf") :
+      mode === "translate" ? t("greeting.translate") :
+      mode === "improve" ? t("greeting.improve") :
+      mode === "image" ? t("greeting.image") :
       t("greeting");
   }
 }
@@ -456,7 +546,7 @@ function parseSel(value) {
   return { providerId: value.slice(0, i), modelId: value.slice(i + 1) };
 }
 function currentSelection() {
-  return parseSel(els.modelSelect.value);
+  return parseSel(mainValue);
 }
 
 function syncToggleVisibility() {
@@ -499,11 +589,13 @@ async function applyModelChoice(value) {
   return sel;
 }
 
-async function onModelChange() {
+// A model was picked in the MAIN combobox.
+async function onMainPick(value) {
+  mainValue = value;
   // In the Image tab the picker selects an IMAGE model (provider + model used by
   // runImage), not the chat model.
   if (mode === "image") {
-    const sel = parseSel(els.modelSelect.value);
+    const sel = parseSel(value);
     if (sel.providerId) {
       settings.imageProvider = sel.providerId;
       settings.imageModel = sel.modelId;
@@ -512,9 +604,19 @@ async function onModelChange() {
     }
     return;
   }
-  await applyModelChoice(els.modelSelect.value);
-  // Keep the Terminal picker in sync with the same choice.
-  if (els.termModel) els.termModel.value = els.modelSelect.value;
+  await applyModelChoice(value);
+  termValue = value; // keep the Terminal picker in sync
+  if (termCombo) termCombo.refresh();
+}
+// A model was picked in the TERMINAL combobox.
+async function onTermPick(value) {
+  termValue = value;
+  const sel = await applyModelChoice(value);
+  if (sel) {
+    termAppend("sys", t("term.modelLine", { model: sel.modelId }));
+    mainValue = value;
+    if (mainCombo) mainCombo.refresh();
+  }
 }
 
 // One-click free onboarding: OAuth to OpenRouter (free models, no manual key).
@@ -604,6 +706,357 @@ async function autoListConnected() {
   refreshModelUI();
 }
 
+// ----- Model picker: searchable combobox + price/provider filter -------------
+const ALL_TIERS = ["free", "green", "yellow", "orange", "red"];
+function filterState() {
+  return settings.modelFilter || { tiers: [...ALL_TIERS], providers: [], subproviders: [] };
+}
+function filterIsActive() {
+  const f = filterState();
+  return (f.providers && f.providers.length > 0) || (f.subproviders && f.subproviders.length > 0) ||
+    (f.tiers && f.tiers.length < ALL_TIERS.length);
+}
+// Does a combobox item pass the current price/provider filter + the typed query?
+function comboPasses(it, q) {
+  if (q) {
+    const hay = (it.label + " " + it.value).toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  const f = filterState();
+  if (it.tier && f.tiers && f.tiers.length && !f.tiers.includes(it.tier)) return false;
+  if (f.providers && f.providers.length && !f.providers.includes(it.provider)) return false;
+  if (it.provider === "openrouter" && it.subprovider && f.subproviders && f.subproviders.length && !f.subproviders.includes(it.subprovider)) return false;
+  return true;
+}
+
+// Reusable searchable combobox. `input` shows the selected label and is type-to-filter;
+// `menu` is a floating list. `items()` returns {value,label,provider,subprovider,tier,
+// color,group}; `getValue()`/`onPick(value)` read & set the selection.
+function makeCombo({ input, menu, items, getValue, onPick }) {
+  let openState = false;
+  function curLabel() {
+    const v = getValue();
+    const it = items().find((x) => x.value === v);
+    if (it) return it.label;
+    return v ? (v.split("|")[1] || v) : "";
+  }
+  function syncLabel() { if (!openState) input.value = curLabel(); }
+  function render() {
+    const q = openState ? input.value.trim().toLowerCase() : "";
+    const list = items().filter((it) => comboPasses(it, q));
+    menu.innerHTML = "";
+    if (!list.length) {
+      const d = document.createElement("div"); d.className = "combo-empty"; d.textContent = t("filter.noMatch"); menu.appendChild(d);
+      return;
+    }
+    const cur = getValue();
+    let lastG = null;
+    for (const it of list) {
+      if (it.group && it.group !== lastG) {
+        lastG = it.group;
+        const h = document.createElement("div"); h.className = "combo-group"; h.textContent = it.group; menu.appendChild(h);
+      }
+      const row = document.createElement("div");
+      row.className = "combo-item" + (it.value === cur ? " sel" : "");
+      row.textContent = it.label;
+      row.title = it.label;
+      if (it.color) row.style.color = it.color;
+      row.addEventListener("mousedown", (e) => { e.preventDefault(); pick(it); });
+      menu.appendChild(row);
+    }
+  }
+  function position() {
+    menu.classList.remove("hidden");
+    const r = input.getBoundingClientRect();
+    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - mw - 8));
+    let top = r.bottom + 4;
+    if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 4);
+    menu.style.left = left + "px";
+    menu.style.top = top + "px";
+  }
+  function open() { openState = true; input.value = ""; render(); position(); }
+  function close() { openState = false; menu.classList.add("hidden"); syncLabel(); }
+  function pick(it) { openState = false; menu.classList.add("hidden"); input.value = it.label; onPick(it.value); }
+  input.addEventListener("focus", open);
+  input.addEventListener("input", () => { openState = true; render(); position(); });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { close(); input.blur(); }
+    else if (e.key === "Enter") { e.preventDefault(); const first = menu.querySelector(".combo-item"); if (first) first.dispatchEvent(new MouseEvent("mousedown")); }
+  });
+  return {
+    refresh: () => { syncLabel(); if (openState) render(); },
+    render: () => { if (openState) { render(); position(); } },
+    close,
+    isOpen: () => openState,
+    input,
+  };
+}
+
+// Filter applied to the per-message compare <select>s (native), which mirror the
+// combobox filter. (The main + terminal pickers are comboboxes and filter internally.)
+function applyModelFilter() {
+  const f = filterState();
+  const tiers = new Set(f.tiers || []);
+  const provs = new Set(f.providers || []);
+  const subs = new Set(f.subproviders || []);
+  for (const sel of document.querySelectorAll(".cmp-select")) {
+    const current = sel.value;
+    for (const o of sel.querySelectorAll("option")) {
+      if (!o.value || o.value === current) { o.hidden = false; continue; }
+      let vis = true;
+      if (provs.size && o.dataset.provider && !provs.has(o.dataset.provider)) vis = false;
+      if (vis && o.dataset.tier && tiers.size && !tiers.has(o.dataset.tier)) vis = false;
+      if (vis && o.dataset.provider === "openrouter" && o.dataset.subprovider && subs.size && !subs.has(o.dataset.subprovider)) vis = false;
+      o.hidden = !vis;
+    }
+    for (const g of sel.querySelectorAll("optgroup")) g.hidden = !Array.from(g.querySelectorAll("option")).some((o) => !o.hidden);
+  }
+}
+function buildFilterPanel() {
+  const f = filterState();
+  const tiers = new Set(f.tiers || []);
+  els.modelFilterPanel.querySelectorAll(".ftier-cb").forEach((cb) => { cb.checked = tiers.has(cb.value); });
+  els.filterProviders.innerHTML = "";
+  const provs = new Set(f.providers || []);
+  const subs = new Set(f.subproviders || []);
+  const connected = connectedProviders(settings);
+  for (const pid of connected) {
+    const lab = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.value = pid; cb.checked = provs.size ? provs.has(pid) : true; cb.dataset.kind = "provider";
+    cb.addEventListener("change", onProviderFilterChange);
+    const sp = document.createElement("span");
+    sp.textContent = PROVIDERS[pid] ? PROVIDERS[pid].label : pid;
+    lab.appendChild(cb); lab.appendChild(sp);
+    els.filterProviders.appendChild(lab);
+    // OpenRouter: list its vendors as indented sub-providers so OpenRouter models can
+    // be filtered by their origin (Google / OpenAI / Anthropic / Meta…).
+    if (pid === "openrouter" && settings.orModels && settings.orModels.length) {
+      const vendors = [...new Set(settings.orModels.filter((m) => !orUnavailable.has(m.id)).map((m) => m.id.split("/")[0] || "other"))].sort();
+      for (const v of vendors) {
+        const l2 = document.createElement("label"); l2.className = "subprov";
+        const c2 = document.createElement("input");
+        c2.type = "checkbox"; c2.value = v; c2.checked = subs.size ? subs.has(v) : true; c2.dataset.kind = "subprovider";
+        c2.addEventListener("change", onSubproviderFilterChange);
+        const s2 = document.createElement("span"); s2.textContent = prettifyVendor(v);
+        l2.appendChild(c2); l2.appendChild(s2);
+        els.filterProviders.appendChild(l2);
+      }
+    }
+  }
+}
+function openFilterPanel(anchor) {
+  buildFilterPanel();
+  const p = els.modelFilterPanel;
+  p.classList.remove("hidden");
+  const r = anchor.getBoundingClientRect();
+  const pw = p.offsetWidth, ph = p.offsetHeight;
+  const left = Math.max(8, Math.min(r.right - pw, window.innerWidth - pw - 8));
+  let top = r.bottom + 6;
+  if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 6);
+  p.style.left = left + "px";
+  p.style.top = top + "px";
+}
+function toggleFilterPanel(anchor) {
+  if (els.modelFilterPanel.classList.contains("hidden")) openFilterPanel(anchor);
+  else els.modelFilterPanel.classList.add("hidden");
+}
+function persistFilter() {
+  clearTimeout(filterPersistTimer);
+  filterPersistTimer = setTimeout(() => setSettings({ modelFilter: settings.modelFilter }), 250);
+}
+// Re-render whatever is open after a filter change.
+function afterFilterChange() {
+  if (mainCombo) mainCombo.render();
+  if (termCombo) termCombo.render();
+  applyModelFilter();
+  els.modelFilterBtn.classList.toggle("active", filterIsActive());
+}
+function onTierFilterChange() {
+  const tiers = [];
+  els.modelFilterPanel.querySelectorAll(".ftier-cb").forEach((cb) => { if (cb.checked) tiers.push(cb.value); });
+  settings.modelFilter = { ...filterState(), tiers };
+  persistFilter(); afterFilterChange();
+}
+function onProviderFilterChange() {
+  const provs = [];
+  els.filterProviders.querySelectorAll('input[data-kind="provider"]').forEach((cb) => { if (cb.checked) provs.push(cb.value); });
+  const connected = connectedProviders(settings);
+  settings.modelFilter = { ...filterState(), providers: provs.length === connected.length ? [] : provs };
+  persistFilter(); afterFilterChange();
+}
+function onSubproviderFilterChange() {
+  const all = els.filterProviders.querySelectorAll('input[data-kind="subprovider"]');
+  const subs = [];
+  all.forEach((cb) => { if (cb.checked) subs.push(cb.value); });
+  settings.modelFilter = { ...filterState(), subproviders: subs.length === all.length ? [] : subs };
+  persistFilter(); afterFilterChange();
+}
+function resetFilter() {
+  settings.modelFilter = { tiers: [...ALL_TIERS], providers: [], subproviders: [] };
+  persistFilter();
+  buildFilterPanel();
+  afterFilterChange();
+}
+
+// ----- Composer attachments (files / images as AI context) -------------------
+async function addAttachmentFiles(fileList) {
+  for (const file of Array.from(fileList || [])) {
+    try { await readOneAttachment(file); }
+    catch (_) { addMessage("error", t("attach.unsupported", { name: file.name })); }
+  }
+  renderAttachStrip();
+}
+async function readOneAttachment(file) {
+  const isImage = (file.type || "").startsWith("image/");
+  const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+  const maxMB = isImage ? ATT_IMG_MAX_MB : ATT_TXT_MAX_MB;
+  if (file.size > maxMB * 1024 * 1024) { addMessage("error", t("attach.tooBig", { name: file.name, mb: maxMB })); return; }
+  if (isImage) {
+    const dataUrl = await readFileAs(file, "dataURL");
+    attachments.push({ type: "image", name: file.name, dataUrl, mediaType: file.type || "image/png" });
+  } else if (isPdf) {
+    const buf = await file.arrayBuffer();
+    const { text, pages } = await extractPdfText(buf);
+    attachments.push({ type: "text", name: file.name, text, isPdf: true, pages });
+  } else {
+    const text = await readFileAs(file, "text");
+    attachments.push({ type: "text", name: file.name, text: text || "" });
+  }
+}
+function readFileAs(file, how) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(r.error);
+    if (how === "dataURL") r.readAsDataURL(file); else r.readAsText(file);
+  });
+}
+async function extractPdfText(buf) {
+  if (!window.pdfjsLib) throw new Error("pdf.js not loaded");
+  if (!pdfWorkerSet) { window.pdfjsLib.GlobalWorkerOptions.workerSrc = browser.runtime.getURL("vendor/pdf.worker.min.js"); pdfWorkerSet = true; }
+  const doc = await window.pdfjsLib.getDocument({ data: buf }).promise;
+  let text = "";
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map((it) => it.str || "").join(" ") + "\n\n";
+  }
+  return { text: text.trim(), pages: doc.numPages };
+}
+function renderAttachStrip() {
+  els.attachStrip.innerHTML = "";
+  els.attachStrip.classList.toggle("hidden", attachments.length === 0);
+  attachments.forEach((a, i) => {
+    const chip = document.createElement("div");
+    chip.className = "attach-chip";
+    if (a.type === "image") {
+      const img = document.createElement("img"); img.src = a.dataUrl; chip.appendChild(img);
+    } else {
+      const ic = document.createElement("span"); ic.textContent = a.isPdf ? "📄" : "📎"; chip.appendChild(ic);
+    }
+    const name = document.createElement("span"); name.className = "acn"; name.textContent = a.name; chip.appendChild(name);
+    const x = document.createElement("button"); x.className = "ax"; x.textContent = "✕"; x.title = t("attach.remove");
+    x.addEventListener("click", () => { attachments.splice(i, 1); renderAttachStrip(); });
+    chip.appendChild(x);
+    els.attachStrip.appendChild(chip);
+  });
+}
+function clearAttachments() { attachments = []; renderAttachStrip(); }
+// Split the pending attachments into the image list (for vision) + a folded text
+// block (for any model) + render metadata for the user bubble.
+function takeAttachments() {
+  const imgs = attachments.filter((a) => a.type === "image");
+  const texts = attachments.filter((a) => a.type === "text");
+  let textBlock = "";
+  for (const a of texts) {
+    const head = a.isPdf ? `[Attached PDF: ${a.name} (${a.pages} pages)]` : `[Attached file: ${a.name}]`;
+    textBlock += `${head}\n${(a.text || "").slice(0, ATT_TXT_BUDGET)}\n\n`;
+  }
+  const meta = attachments.map((a) => ({ type: a.type, name: a.name, dataUrl: a.type === "image" ? a.dataUrl : undefined, isPdf: a.isPdf }));
+  return { imgs, textBlock, meta };
+}
+// Build the native per-turn user content. With image attachments we switch to the
+// provider's multimodal content array (Anthropic image blocks / OpenAI image_url).
+function buildUserContent(text, imgs, providerId) {
+  if (!imgs || !imgs.length) return text;
+  const kind = (PROVIDERS[providerId] && PROVIDERS[providerId].kind) || "openai";
+  if (kind === "anthropic") {
+    const parts = [{ type: "text", text }];
+    for (const a of imgs) {
+      const m = /^data:([^;]+);base64,(.*)$/.exec(a.dataUrl || "");
+      if (m) parts.push({ type: "image", source: { type: "base64", media_type: m[1], data: m[2] } });
+    }
+    return parts;
+  }
+  const parts = [{ type: "text", text }];
+  for (const a of imgs) parts.push({ type: "image_url", image_url: { url: a.dataUrl } });
+  return parts;
+}
+
+// ----- Open in a full-screen tab --------------------------------------------
+function openInTab() {
+  const url = browser.runtime.getURL("src/sidebar/sidebar.html") + "?tab=1";
+  try { browser.tabs.create({ url }); } catch (_) { window.open(url, "_blank", "noopener"); }
+  // Close the docked sidebar so we don't show the same UI twice (Firefox only API).
+  try { if (browser.sidebarAction && browser.sidebarAction.close) browser.sidebarAction.close(); } catch (_) {}
+}
+
+// ----- Element picker -------------------------------------------------------
+// "Ask about this element": the user points at a table / image / menu on the page;
+// we capture its text + a cropped screenshot (vision) and stage them as attachments,
+// so the next message can ask a question grounded in that exact element.
+async function getActiveTabId() {
+  try {
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    return tabs && tabs[0] ? tabs[0].id : null;
+  } catch (_) { return null; }
+}
+function loadImage(src) {
+  return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+}
+async function captureElementShot(rect, dpr) {
+  await new Promise((r) => setTimeout(r, 160)); // let the picker overlay clear + repaint
+  const shot = await browser.tabs.captureVisibleTab(undefined, { format: "png" });
+  const img = await loadImage(shot);
+  const sx = Math.max(0, rect.x * dpr), sy = Math.max(0, rect.y * dpr);
+  const sw = Math.min(img.width - sx, rect.w * dpr), sh = Math.min(img.height - sy, rect.h * dpr);
+  if (sw <= 4 || sh <= 4) return shot; // tiny/odd rect → fall back to the full screenshot
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(sw); canvas.height = Math.round(sh);
+  canvas.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/png");
+}
+async function pickElement() {
+  const tabId = await getActiveTabId();
+  if (tabId == null) { addMessage("error", t("pick.error")); return; }
+  if (mode !== "chat" && mode !== "agent") setMode("chat");
+  const note = addMessage("tool", t("pick.start"));
+  let res;
+  try {
+    res = await browser.tabs.sendMessage(tabId, { type: "pick_element" });
+  } catch (_) {
+    note.remove();
+    addMessage("error", t("pick.error"));
+    return;
+  }
+  note.remove();
+  if (!res || res.cancelled) return;
+  // Cropped screenshot of the element (works for tables, images, menus…) for vision.
+  try {
+    const shot = await captureElementShot(res.rect, res.dpr || 1);
+    if (shot) attachments.push({ type: "image", name: t("pick.imgName", { tag: res.tag }), dataUrl: shot, mediaType: "image/png" });
+  } catch (_) {}
+  // Element text/structure for non-vision models.
+  if (res.text) {
+    attachments.push({ type: "text", name: t("pick.attName", { tag: res.tag }), text: `[Selected <${res.tag}> on ${res.title} — ${res.url}]\n${res.text}` });
+  }
+  renderAttachStrip();
+  addMessage("tool", t("pick.added", { tag: res.tag }));
+  els.input.focus();
+}
+
 // ----- Workspace modes ------------------------------------------------------
 function setMode(next) {
   const prev = mode;
@@ -615,12 +1068,20 @@ function setMode(next) {
   setSettings({ mode: next });
   if (CHAT_MODES.includes(next)) loadSessionToGlobals(next);
   els.rail.querySelectorAll(".railtab").forEach((b) => b.classList.toggle("active", b.dataset.mode === next));
-  // Chat + Agent share the chat composer & the Réflexion/Web/Page chips.
-  els.chatControls.classList.toggle("hidden", !(next === "chat" || next === "agent"));
+  // The Thinking/Web/Page chips belong to Chat only — they have no role in Agent mode
+  // (which drives tools), so they're hidden there.
+  els.chatControls.classList.toggle("hidden", next !== "chat");
   els.translateControls.classList.toggle("hidden", next !== "translate");
   els.improveControls.classList.toggle("hidden", next !== "improve");
   els.imageControls.classList.toggle("hidden", next !== "image");
   els.pdfControls.classList.toggle("hidden", next !== "pdf");
+  // Attach (+) is offered on Chat/Agent/Translate/Improve/Image only.
+  const composeExtras = ["chat", "agent", "translate", "improve", "image"].includes(next);
+  els.attachBtn.hidden = !composeExtras;
+  if (!composeExtras && attachments.length) clearAttachments();
+  els.modelFilterPanel.classList.add("hidden");
+  if (mainCombo) mainCombo.close();
+  if (termCombo) termCombo.close();
   document.body.classList.toggle("mode-terminal", next === "terminal");
   document.body.classList.toggle("mode-code", next === "code");
   els.terminalView.classList.toggle("hidden", next !== "terminal");
@@ -670,7 +1131,7 @@ async function openCodeApp() {
 
 // ----- Terminal workspace (OpenClaude) --------------------------------------
 function termModelLabel() {
-  const sel = parseSel(els.termModel && els.termModel.value);
+  const sel = parseSel(termValue);
   if (!sel.providerId) return t("term.noModel");
   return sel.modelId;
 }
@@ -744,7 +1205,7 @@ async function termSend(rawText) {
     termAppend("sys", t("term.help"));
     return;
   }
-  const sel = parseSel(els.termModel.value);
+  const sel = parseSel(termValue);
   if (!sel.providerId || currentKeyMissing(sel.providerId)) {
     termAppend("err", t("term.noModelConnected"));
     return;
@@ -930,7 +1391,9 @@ async function saveCurrent() {
 }
 function renderTranscriptItem(item) {
   if (item.role === "user") {
-    return addMessage("user", item.text);
+    const d = addMessage("user", item.text);
+    if (item.atts) renderUserAttachments(d, item.atts);
+    return d;
   } else if (item.kind === "image") {
     const wrap = addMessage("assistant", "");
     if (item.badge) {
@@ -993,7 +1456,45 @@ async function consumePendingAction() {
 
 // ----- Wiring ---------------------------------------------------------------
 function wire() {
-  els.modelSelect.addEventListener("change", onModelChange);
+  // Searchable model comboboxes (main picker + terminal picker).
+  mainCombo = makeCombo({
+    input: els.modelInput, menu: els.modelMenu,
+    items: () => (mode === "image" ? imageComboItems() : chatComboItems()),
+    getValue: () => mainValue, onPick: onMainPick,
+  });
+  termCombo = makeCombo({
+    input: els.termModelInput, menu: els.termModelMenu,
+    items: () => chatComboItems(),
+    getValue: () => termValue, onPick: onTermPick,
+  });
+  // Close any open combo menu when clicking outside it.
+  document.addEventListener("mousedown", (e) => {
+    if (mainCombo.isOpen() && e.target !== els.modelInput && !els.modelMenu.contains(e.target)) mainCombo.close();
+    if (termCombo.isOpen() && e.target !== els.termModelInput && !els.termModelMenu.contains(e.target)) termCombo.close();
+  });
+
+  // Open the sidebar as a full-screen browser tab (hidden when already in a tab).
+  if (IS_TAB) els.expandTab.hidden = true;
+  else els.expandTab.addEventListener("click", openInTab);
+
+  // Composer: attachments (+).
+  els.attachBtn.addEventListener("click", () => els.attachInput.click());
+  els.attachInput.addEventListener("change", async (e) => {
+    await addAttachmentFiles(e.target.files);
+    e.target.value = ""; // allow re-selecting the same file
+  });
+
+  // Model filter popover (price tiers + providers / OpenRouter sub-vendors).
+  els.modelFilterBtn.addEventListener("click", () => toggleFilterPanel(els.modelFilterBtn));
+  if (els.termFilterBtn) els.termFilterBtn.addEventListener("click", () => toggleFilterPanel(els.termFilterBtn));
+  els.modelFilterPanel.querySelectorAll(".ftier-cb").forEach((cb) => cb.addEventListener("change", onTierFilterChange));
+  els.filterReset.addEventListener("click", resetFilter);
+  els.filterClose.addEventListener("click", () => els.modelFilterPanel.classList.add("hidden"));
+  document.addEventListener("click", (e) => {
+    if (els.modelFilterPanel.classList.contains("hidden")) return;
+    if (els.modelFilterPanel.contains(e.target) || els.modelFilterBtn.contains(e.target) || (els.termFilterBtn && els.termFilterBtn.contains(e.target))) return;
+    els.modelFilterPanel.classList.add("hidden");
+  });
 
   const bindToggle = (el, key, after) =>
     el.addEventListener("change", async () => {
@@ -1049,12 +1550,16 @@ function wire() {
   });
   els.closeHistory.addEventListener("click", () => els.historyPanel.classList.add("hidden"));
 
-  els.tabsBtn.addEventListener("click", async () => {
+  // Clicking ANYWHERE on the page bar expands/collapses the tabs panel — except the
+  // 🖱 pick button, which launches element capture instead.
+  els.pageBar.addEventListener("click", async (e) => {
+    if (els.pickEl.contains(e.target)) return;
     const show = els.tabsPanel.classList.contains("hidden");
     if (show) await buildTabsList();
     els.tabsPanel.classList.toggle("hidden");
   });
-  els.tabsRefresh.addEventListener("click", buildTabsList);
+  els.pickEl.addEventListener("click", (e) => { e.stopPropagation(); pickElement(); });
+  els.tabsRefresh.addEventListener("click", (e) => { e.stopPropagation(); buildTabsList(); });
   els.tabsList.addEventListener("change", persistSelectedTabs);
 
   els.send.addEventListener("click", onSend);
@@ -1082,13 +1587,7 @@ function wire() {
   });
   els.termInput.addEventListener("input", autoGrowTerm);
   els.termClear.addEventListener("click", termClearAll);
-  els.termModel.addEventListener("change", async () => {
-    const sel = await applyModelChoice(els.termModel.value);
-    if (sel) {
-      termAppend("sys", t("term.modelLine", { model: sel.modelId }));
-      if (els.modelSelect) els.modelSelect.value = els.termModel.value;
-    }
-  });
+  // (The terminal model picker is a combobox; selection is handled by onTermPick.)
 
   els.openOptions.addEventListener("click", () => browser.runtime.openOptionsPage());
   els.modelConnect.addEventListener("click", () => browser.runtime.openOptionsPage());
@@ -1128,6 +1627,20 @@ function addMessage(role, text) {
   els.messages.appendChild(div);
   els.messages.scrollTop = els.messages.scrollHeight;
   return div;
+}
+// Render attachment thumbnails/chips inside a user message bubble.
+function renderUserAttachments(div, meta) {
+  if (!meta || !meta.length) return;
+  const box = document.createElement("div");
+  box.className = "att-thumbs";
+  for (const a of meta) {
+    if (a.type === "image" && a.dataUrl) {
+      const img = document.createElement("img"); img.src = a.dataUrl; img.alt = a.name || ""; box.appendChild(img);
+    } else {
+      const f = document.createElement("span"); f.className = "att-file"; f.textContent = (a.isPdf ? "📄 " : "📎 ") + (a.name || "file"); box.appendChild(f);
+    }
+  }
+  div.appendChild(box);
 }
 function addThinkBlock() {
   els.empty.classList.add("hidden");
@@ -1297,7 +1810,7 @@ function attachCompareBar(el) {
   fillModelSelect(sel, null);
   // Default to a model different from the current one.
   for (const opt of sel.options) {
-    if (opt.value && opt.value !== els.modelSelect.value) { sel.value = opt.value; break; }
+    if (opt.value && opt.value !== mainValue) { sel.value = opt.value; break; }
   }
   const btn = document.createElement("button");
   btn.className = "cmp-btn";
@@ -1307,6 +1820,7 @@ function attachCompareBar(el) {
   bar.appendChild(sel);
   bar.appendChild(btn);
   el.appendChild(bar);
+  applyModelFilter(); // honour the active price/provider filter in the compare list
 }
 
 async function compareLast(second, btn) {
@@ -1339,7 +1853,7 @@ async function compareLast(second, btn) {
 }
 
 // ----- Core send ------------------------------------------------------------
-async function sendToModel(displayText, modelContent, { forceWeb = false, runMode = "chat" } = {}) {
+async function sendToModel(displayText, modelContent, { forceWeb = false, runMode = "chat", attImgs = [], attMeta = [] } = {}) {
   if (busy) return;
   const sel = currentSelection();
   if (currentKeyMissing(sel.providerId)) {
@@ -1359,8 +1873,9 @@ async function sendToModel(displayText, modelContent, { forceWeb = false, runMod
   // never lost or misrouted (that's the "Chat loses responses on switch" fix).
   const sess = getSession(mode);
   const sessMode = mode;
-  addMessage("user", displayText);
-  sess.transcript.push({ role: "user", text: displayText });
+  const userDiv = addMessage("user", displayText);
+  if (attMeta && attMeta.length) renderUserAttachments(userDiv, attMeta);
+  sess.transcript.push({ role: "user", text: displayText, atts: attMeta && attMeta.length ? attMeta : undefined });
   lastUserContent = modelContent;
   lastRunMode = runMode;
   lastForceWeb = forceWeb;
@@ -1402,11 +1917,14 @@ async function sendToModel(displayText, modelContent, { forceWeb = false, runMod
     }
   }
 
+  // With image attachments, switch the user turn to the provider's multimodal
+  // content array (vision). Text-file attachments are already folded into modelContent.
+  const userContent = buildUserContent(modelContent, attImgs, turnSel.providerId);
   let turnHistory;
   if (isolated) {
-    turnHistory = [{ role: "user", content: modelContent }];
+    turnHistory = [{ role: "user", content: userContent }];
   } else {
-    sess.history.push({ role: "user", content: modelContent });
+    sess.history.push({ role: "user", content: userContent });
     turnHistory = sess.history;
   }
   const provider = makeProvider(
@@ -1463,42 +1981,57 @@ async function onTerminalSend() {
 }
 async function onChatSend() {
   const text = els.input.value.trim();
-  if (!text) return;
+  const { imgs, textBlock, meta } = takeAttachments();
+  if (!text && !meta.length) return;
   els.input.value = "";
+  clearAttachments();
   let prefix = "";
   if (!agentActive()) {
     if (els.pageCtx.checked && currentPage) prefix += pageContextBlock();
     prefix += await selectedTabsContext();
   }
-  const content = prefix ? prefix + `[Message]\n${text}` : text;
-  await sendToModel(text, content);
+  if (textBlock) prefix += textBlock; // attached files/PDFs folded in as context
+  const body = text || (imgs.length ? "Please look at the attached image(s)." : "Please use the attached file(s).");
+  const content = prefix ? prefix + `[Message]\n${body}` : body;
+  await sendToModel(text, content, { attImgs: imgs, attMeta: meta });
 }
 async function runTranslateFromInput() {
   const lang = els.translateLang.value || "French";
   let txt = els.input.value.trim();
+  const { imgs, textBlock, meta } = takeAttachments();
   // Show the actual user input as the message; only fall back to a short label when
   // translating the current page (where the "input" is the whole page text).
   let displayText = txt;
-  if (!txt) {
+  if (!txt && textBlock) txt = textBlock; // translate an attached file's text
+  if (!txt && !imgs.length) {
     txt = currentPage ? (currentPage.text || "").slice(0, settings.maxPageChars) : "";
     displayText = t("label.translatePage");
+  } else if (textBlock && displayText) {
+    txt = `${txt}\n\n${textBlock}`; // typed text + attached file together
   }
-  if (!txt) return addMessage("error", t("err.nothingToTranslateInput"));
+  if (!txt && !imgs.length) return addMessage("error", t("err.nothingToTranslateInput"));
   els.input.value = "";
-  await sendToModel(displayText, t("prompt.translate", { lang, text: txt }), { runMode: "translate" });
+  clearAttachments();
+  await sendToModel(displayText, t("prompt.translate", { lang, text: txt || "(see attached image)" }), { runMode: "translate", attImgs: imgs, attMeta: meta });
 }
 async function runImproveFromInput() {
   const presetId = els.improvePreset.value || "improve";
   let txt = els.input.value.trim();
+  const { imgs, textBlock, meta } = takeAttachments();
   if (!txt) txt = await getSelection();
-  if (!txt) return addMessage("error", t("err.typeOrSelect"));
+  if (!txt && textBlock) txt = textBlock; // improve an attached file's text
+  else if (textBlock) txt = `${txt}\n\n${textBlock}`;
+  if (!txt && !imgs.length) return addMessage("error", t("err.typeOrSelect"));
   els.input.value = "";
+  clearAttachments();
   const instruction = t("presetPrompt." + presetId);
   // Show the user's own text as the message (not the preset label).
-  await sendToModel(txt, `${instruction}\n${t("improve.only")}\n\n${t("improve.textLabel")}\n${txt}`, { runMode: "improve" });
+  await sendToModel(txt, `${instruction}\n${t("improve.only")}\n\n${t("improve.textLabel")}\n${txt}`, { runMode: "improve", attImgs: imgs, attMeta: meta });
 }
 async function runImageFromInput() {
   const prompt = els.input.value.trim();
+  // Image generation has no img2img path here, so any pending attachments are cleared.
+  if (attachments.length) clearAttachments();
   if (!prompt) return addMessage("error", t("err.describeImage"));
   els.input.value = "";
   await runImage(prompt);

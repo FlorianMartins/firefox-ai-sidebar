@@ -25,6 +25,44 @@ const EN = {
   "tabs.btnTitle": "Choose which tabs to give the AI",
   "tabs.use": "Use the ticked tabs",
   "refresh.title": "Refresh",
+  "expand.title": "Open in a full-screen tab",
+
+  // ----- Attachments + voice -------------------------------------------------
+  "attach.title": "Attach files or images (used as context)",
+  "attach.remove": "Remove",
+  "attach.reading": "Reading {name}…",
+  "attach.tooBig": "{name} is too large (max {mb} MB).",
+  "attach.unsupported": "Couldn't read {name}.",
+  "attach.pdfPages": "{name} · {pages} p.",
+
+  // ----- Element picker ------------------------------------------------------
+  "pick.title": "Pick an element on the page to ask about it",
+  "pick.start": "🖱 Click an element on the page to capture it… (Esc to cancel)",
+  "pick.error": "Couldn't pick on this page (open a normal website first).",
+  "pick.attName": "Selected element <{tag}>",
+  "pick.imgName": "Element screenshot <{tag}>",
+  "pick.added": "✓ Captured a <{tag}> element — ask your question below.",
+
+  "mic.title": "Dictate (voice to text)",
+  "mic.listening": "Listening… click to stop",
+  "mic.stop": "Stop dictation",
+  "mic.unsupported": "Voice dictation needs Chrome/Edge, or a connected OpenAI/Groq key (Whisper). It isn't available here.",
+  "mic.transcribing": "Transcribing…",
+  "mic.error": "Dictation failed: {msg}",
+
+  // ----- Model search / filter ----------------------------------------------
+  "filter.title": "Filter models (provider / price)",
+  "filter.price": "Price",
+  "filter.providers": "Providers",
+  "filter.reset": "Reset",
+  "filter.done": "Done",
+  "filter.noMatch": "No model matches",
+  "filter.tierFree": "Free",
+  "filter.tierGreen": "Low cost",
+  "filter.tierYellow": "Affordable",
+  "filter.tierOrange": "Moderate",
+  "filter.tierRed": "Expensive",
+  "model.searchPh": "Search a model…",
 
   // ----- Onboarding / empty state -------------------------------------------
   "onboard.title": "AI Sidebar — plug in your AI",
@@ -35,7 +73,10 @@ const EN = {
   "greeting": "How can I help you?",
   "greeting.terminal": "⌨️ Terminal ready — describe a coding task.",
   "greeting.agent": "What can I do for you?",
-  "greeting.pdf": "📄 Load a PDF, then ask questions about it, summarize it, or extract its text & page images.",
+  "greeting.translate": "What would you like to translate today?",
+  "greeting.improve": "What would you like to improve?",
+  "greeting.image": "What would you like to create today?",
+  "greeting.pdf": "With which PDF file would you like my help?",
 
   // ----- PDF workspace -------------------------------------------------------
   "rail.pdf": "PDF",
@@ -85,14 +126,14 @@ const EN = {
   "code.setUrl": "Set the URL in Settings → Code workshop.",
   "code.feat1": "⚡ AI code generation &amp; editing",
   "code.feat2": "👁 Live preview (web) in the browser",
-  "code.feat3": "📱 Expo Go QR code to test on your phone",
+  "code.feat3": "📱 Expo Go to test on your phone",
   "code.feat4": "⌨️ Built-in terminal &amp; file management",
   "code.sec": "🔒 The workshop opens in an isolated tab. It uses the same providers as the sidebar — your OpenRouter key is handed over for you, so you never re-enter it. URL configurable in <b>Settings → Code workshop</b>.",
 
   // ----- Controls / model bar / composer ------------------------------------
   "confirm.allow": "Allow",
   "confirm.deny": "Deny",
-  "chip.thinking": "💭 Reasoning",
+  "chip.thinking": "💭 Thinking",
   "chip.thinkingTitle": "Show the model's reasoning",
   "chip.webTitle": "Web search (Perplexity / OpenRouter / Claude) — configurable in ⚙",
   "chip.pageTitle": "The AI sees the current page",
@@ -346,6 +387,44 @@ const FR = {
   "tabs.btnTitle": "Choisir les onglets à donner à l'IA",
   "tabs.use": "Utiliser les onglets cochés",
   "refresh.title": "Rafraîchir",
+  "expand.title": "Ouvrir en plein écran (nouvel onglet)",
+
+  // ----- Pièces jointes + voix -----------------------------------------------
+  "attach.title": "Joindre des fichiers ou images (utilisés comme contexte)",
+  "attach.remove": "Retirer",
+  "attach.reading": "Lecture de {name}…",
+  "attach.tooBig": "{name} est trop volumineux (max {mb} Mo).",
+  "attach.unsupported": "Impossible de lire {name}.",
+  "attach.pdfPages": "{name} · {pages} p.",
+
+  // ----- Sélecteur d'élément -------------------------------------------------
+  "pick.title": "Sélectionner un élément de la page pour l'interroger",
+  "pick.start": "🖱 Cliquez un élément de la page pour le capturer… (Échap pour annuler)",
+  "pick.error": "Impossible de sélectionner sur cette page (ouvrez d'abord un site web normal).",
+  "pick.attName": "Élément sélectionné <{tag}>",
+  "pick.imgName": "Capture de l'élément <{tag}>",
+  "pick.added": "✓ Élément <{tag}> capturé — posez votre question ci-dessous.",
+
+  "mic.title": "Dicter (voix vers texte)",
+  "mic.listening": "Écoute… cliquez pour arrêter",
+  "mic.stop": "Arrêter la dictée",
+  "mic.unsupported": "La dictée vocale nécessite Chrome/Edge, ou une clé OpenAI/Groq connectée (Whisper). Indisponible ici.",
+  "mic.transcribing": "Transcription…",
+  "mic.error": "Échec de la dictée : {msg}",
+
+  // ----- Recherche / filtre de modèles ---------------------------------------
+  "filter.title": "Filtrer les modèles (fournisseur / prix)",
+  "filter.price": "Prix",
+  "filter.providers": "Fournisseurs",
+  "filter.reset": "Réinitialiser",
+  "filter.done": "OK",
+  "filter.noMatch": "Aucun modèle ne correspond",
+  "filter.tierFree": "Gratuit",
+  "filter.tierGreen": "Peu cher",
+  "filter.tierYellow": "Abordable",
+  "filter.tierOrange": "Modéré",
+  "filter.tierRed": "Cher",
+  "model.searchPh": "Rechercher un modèle…",
 
   "onboard.title": "Sidebar IA — branchez votre IA",
   "onboard.lead": "Le plus simple et <b>gratuit</b> : connectez-vous à <b>OpenRouter</b> (compte Google / GitHub / email) — accès à des <b>modèles gratuits</b> (Llama, Gemini, DeepSeek…) sans gérer de clé.",
@@ -355,7 +434,10 @@ const FR = {
   "greeting": "Comment puis-je vous aider ?",
   "greeting.terminal": "⌨️ Terminal prêt — décrivez une tâche de code.",
   "greeting.agent": "Que puis-je faire pour vous ?",
-  "greeting.pdf": "📄 Chargez un PDF, puis posez des questions, résumez-le, ou extrayez son texte et les images des pages.",
+  "greeting.translate": "Que souhaitez-vous traduire aujourd'hui ?",
+  "greeting.improve": "Que souhaitez-vous améliorer ?",
+  "greeting.image": "Que souhaitez-vous créer aujourd'hui ?",
+  "greeting.pdf": "Avec quel fichier PDF puis-je vous aider ?",
 
   "rail.pdf": "PDF",
   "rail.pdfTitle": "Lire un PDF et poser des questions",
@@ -402,7 +484,7 @@ const FR = {
   "code.setUrl": "Renseignez l'URL dans Réglages → Atelier de code.",
   "code.feat1": "⚡ Génération &amp; édition de code par l'IA",
   "code.feat2": "👁 Aperçu en direct (web) dans le navigateur",
-  "code.feat3": "📱 QR code Expo Go pour tester sur téléphone",
+  "code.feat3": "📱 Expo Go pour tester sur téléphone",
   "code.feat4": "⌨️ Terminal &amp; gestion de fichiers intégrés",
   "code.sec": "🔒 L'atelier s'ouvre dans un onglet isolé. Il utilise les mêmes fournisseurs que la sidebar — votre clé OpenRouter lui est transmise pour vous, sans la ressaisir. URL configurable dans <b>Réglages → Atelier de code</b>.",
 

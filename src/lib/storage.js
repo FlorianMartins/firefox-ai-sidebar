@@ -47,6 +47,12 @@ const DEFAULTS = {
   improvePreset: "improve", // default writing preset for the "improve" mode
   uiLang: "en", // sidebar interface language: "en" (default) | "fr". Changed from Settings.
 
+  // ----- Model picker filter (price tiers + providers) -----------------------
+  // Persisted state of the model-filter popover shared by every workspace's picker.
+  // `tiers` = price tiers to SHOW; `providers` empty = all; `subproviders` empty = all
+  // (used to filter OpenRouter models by their vendor: google / openai / anthropic…).
+  modelFilter: { tiers: ["free", "green", "yellow", "orange", "red"], providers: [], subproviders: [] },
+
   // ----- Code workspace ------------------------------------------------------
   // The "Code" tab launches a self-hosted AI app builder ("Program Generator",
   // a Bolt.diy instance) in a NEW BROWSER TAB. WebContainers there require

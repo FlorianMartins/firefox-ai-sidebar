@@ -39,6 +39,7 @@ export const PROVIDERS = {
     imageModels: [
       ["gpt-image-1", "GPT Image 1"],
       ["dall-e-3", "DALL·E 3"],
+      ["dall-e-2", "DALL·E 2"],
     ],
     models: [
       ["gpt-4o", "GPT-4o"],
@@ -62,25 +63,54 @@ export const PROVIDERS = {
     // OpenRouter-only user generate images (e.g. Google's "Nano Banana").
     supportsImages: true,
     imageVia: "chat",
+    // auto-maintained by scripts/update-models.mjs
+    // <models:openrouter:image:start>
     imageModels: [
-      ["google/gemini-2.5-flash-image-preview", "Gemini 2.5 Flash Image · Nano Banana"],
-      ["google/gemini-2.5-flash-image", "Gemini 2.5 Flash Image"],
+      ["google/gemini-2.5-flash-image", "Nano Banana (Gemini 2.5 Flash Image)"],
+      ["google/gemini-3-pro-image", "Nano Banana Pro (Gemini 3 Pro Image)"],
+      ["google/gemini-3-pro-image-preview", "Nano Banana Pro (Gemini 3 Pro Image Preview)"],
+      ["google/gemini-3.1-flash-image", "Nano Banana 2 (Gemini 3.1 Flash Image)"],
+      ["google/gemini-3.1-flash-image-preview", "Nano Banana 2 (Gemini 3.1 Flash Image Preview)"],
+      ["openai/gpt-5-image", "GPT-5 Image"],
+      ["openai/gpt-5-image-mini", "GPT-5 Image Mini"],
+      ["openai/gpt-5.4-image-2", "GPT-5.4 Image 2"],
     ],
+    // <models:openrouter:image:end>
+    // The sidebar still fetches the account's LIVE list at runtime; this curated set is
+    // the fallback + out-of-the-box default (free models first, then notable paid
+    // flagships). Regenerated daily by scripts/update-models.mjs from OpenRouter.
+    // <models:openrouter:start>
     models: [
-      // Strongest RELIABLE free models first. The out-of-the-box default picks the
-      // best one actually available on the account (see sidebar.js bestFreeOpenRouter).
-      // GPT-OSS 120B is currently the most capable + dependable free model; DeepSeek
-      // V3 0324 and Llama 4 Maverick are solid alternates. (Free = rate-limited.)
-      ["openai/gpt-oss-120b:free", "GPT-OSS 120B — free (recommended)"],
-      ["openai/gpt-oss-20b:free", "GPT-OSS 20B — free"],
-      ["deepseek/deepseek-chat-v3-0324:free", "DeepSeek V3 0324 — free"],
-      ["meta-llama/llama-4-maverick:free", "Llama 4 Maverick — free"],
-      ["deepseek/deepseek-r1:free", "DeepSeek R1 — free (reasoning)"],
-      ["google/gemini-2.0-flash-exp:free", "Gemini 2.0 Flash — free"],
-      ["anthropic/claude-opus-4.1", "Claude Opus 4.1 (paid)"],
-      ["openai/gpt-4o", "GPT-4o (paid)"],
-      ["deepseek/deepseek-r1", "DeepSeek R1 (paid)"],
+      ["openai/gpt-oss-120b:free", "gpt-oss-120b — free (recommended)"],
+      ["openai/gpt-oss-20b:free", "gpt-oss-20b — free"],
+      ["qwen/qwen3-coder:free", "Qwen3 Coder 480B A35B — free"],
+      ["qwen/qwen3-next-80b-a3b-instruct:free", "Qwen3 Next 80B A3B Instruct — free"],
+      ["nvidia/nemotron-3-nano-30b-a3b:free", "Nemotron 3 Nano 30B A3B — free"],
+      ["nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", "Nemotron 3 Nano Omni — free (reasoning)"],
+      ["nvidia/nemotron-3-super-120b-a12b:free", "Nemotron 3 Super — free"],
+      ["nvidia/nemotron-3-ultra-550b-a55b:free", "Nemotron 3 Ultra — free"],
+      ["nvidia/nemotron-nano-12b-v2-vl:free", "Nemotron Nano 12B 2 VL — free"],
+      ["nvidia/nemotron-nano-9b-v2:free", "Nemotron Nano 9B V2 — free"],
+      ["cognitivecomputations/dolphin-mistral-24b-venice-edition:free", "Uncensored — free"],
+      ["meta-llama/llama-3.3-70b-instruct:free", "Llama 3.3 70B Instruct — free"],
+      ["cohere/north-mini-code:free", "North Mini Code — free"],
+      ["google/gemma-4-26b-a4b-it:free", "Gemma 4 26B A4B — free"],
+      ["google/gemma-4-31b-it:free", "Gemma 4 31B — free"],
+      ["liquid/lfm-2.5-1.2b-instruct:free", "LFM2.5-1.2B-Instruct — free"],
+      ["liquid/lfm-2.5-1.2b-thinking:free", "LFM2.5-1.2B-Thinking — free (reasoning)"],
+      ["meta-llama/llama-3.2-3b-instruct:free", "Llama 3.2 3B Instruct — free"],
+      ["anthropic/claude-opus-4.8-fast", "Claude Opus 4.8 (Fast) (paid)"],
+      ["anthropic/claude-sonnet-4.6", "Claude Sonnet 4.6 (paid)"],
+      ["openai/gpt-4o-mini-search-preview", "GPT-4o-mini Search Preview (paid)"],
+      ["openai/o3-deep-research", "o3 Deep Research (reasoning) (paid)"],
+      ["openai/gpt-4.1", "GPT-4.1 (paid)"],
+      ["google/gemini-2.5-pro", "Gemini 2.5 Pro (paid)"],
+      ["google/gemini-2.5-flash-lite-preview-09-2025", "Gemini 2.5 Flash Lite Preview 09-2025 (paid)"],
+      ["deepseek/deepseek-r1-0528", "R1 0528 (reasoning) (paid)"],
+      ["deepseek/deepseek-chat-v3.1", "DeepSeek V3.1 (paid)"],
+      ["x-ai/grok-build-0.1", "Grok Build 0.1 (paid)"],
     ],
+    // <models:openrouter:end>
   },
 
   google: {

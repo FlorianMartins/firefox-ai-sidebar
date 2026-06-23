@@ -16,6 +16,7 @@
       <div class="row">
         <button id="historyBtn" class="icon icon-accent" data-i18n-title="history.title" title="History (local)"><svg class="glyph-svg" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="url(#histg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><defs><linearGradient id="histg" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6366f1"/><stop offset="0.55" stop-color="#8b5cf6"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs><path d="M3 3.5v5h5"/><path d="M3.5 13a9 9 0 1 0 2.4-6.4L3 8.5"/><path d="M12 7.5v5l3.5 2"/></svg></button>
         <button id="newChat" class="icon icon-accent" data-i18n-title="newChat.title" title="New conversation">+</button>
+        <button id="expandTab" class="icon icon-accent" data-i18n-title="expand.title" title="Open in a full-screen tab"><svg class="glyph-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="url(#histg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M21 3l-8 8"/><path d="M9 21H3v-6"/><path d="M3 21l8-8"/></svg></button>
         <button id="openOptions" class="icon icon-accent" data-i18n-title="settings.title" title="Settings">⚙&#xFE0E;</button>
       </div>
     </header>
@@ -36,6 +37,7 @@
     <div id="pageBar" class="pagebar hidden" data-i18n-title="pagebar.title" title="Page seen by the AI">
       <span class="eye">👁</span>
       <span id="pageTitle" class="page-title"></span>
+      <button id="pickEl" class="icon" data-i18n-title="pick.title" title="Pick an element on the page to ask about it"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 7v3.5"/></svg></button>
       <button id="tabsBtn" class="icon" data-i18n-title="tabs.btnTitle" title="Choose which tabs to give the AI">📑</button>
     </div>
     <div id="tabsPanel" class="panel hidden">
@@ -94,7 +96,10 @@
       <div class="term-head">
         <span class="term-dot r"></span><span class="term-dot y"></span><span class="term-dot g"></span>
         <span class="term-title">OpenClaude — terminal</span>
-        <select id="termModel" class="term-model" data-i18n-title="term.modelTitle" title="Model used by the terminal"></select>
+        <div class="combo term-combo" id="termModelWrap">
+          <input id="termModelInput" class="combo-input" type="text" autocomplete="off" spellcheck="false" data-i18n-ph="model.searchPh" placeholder="Search a model…" />
+        </div>
+        <button id="termFilterBtn" class="term-btn" data-i18n-title="filter.title" title="Filter models"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7z"/></svg></button>
         <button id="termClear" class="term-btn" data-i18n="term.clear" data-i18n-title="term.clearTitle" title="Clear the terminal">clear</button>
       </div>
       <div id="termLog" class="term-log" aria-live="polite"></div>
@@ -104,6 +109,7 @@
           data-i18n-ph="term.inputPh"
           placeholder="describe a coding task…  ('help', 'clear', ↑/↓ history)"></textarea>
       </div>
+      <div id="termModelMenu" class="combo-menu hidden"></div>
     </section>
 
     <!-- Code workspace: a launcher for Program Generator, the full AI app builder
@@ -125,8 +131,8 @@
         <p class="cl-url muted" id="codeAppUrlLabel"></p>
         <ul class="cl-feats">
           <li data-i18n-html="code.feat1">⚡ AI code generation &amp; editing</li>
+          <li data-i18n-html="code.feat3">📱 Expo Go to test on your phone</li>
           <li data-i18n-html="code.feat2">👁 Live preview (web) in the browser</li>
-          <li data-i18n-html="code.feat3">📱 Expo Go QR code to test on your phone</li>
           <li data-i18n-html="code.feat4">⌨️ Built-in terminal &amp; file management</li>
         </ul>
         <p class="cl-sec muted" data-i18n-html="code.sec">
@@ -201,18 +207,51 @@
       </div>
     </div>
 
-    <!-- Model picker (API mode): just above the chat input. Hidden in site mode. -->
+    <!-- Model picker (API mode): a searchable combobox just above the chat input.
+         Type to filter the list (e.g. "gemi" → Gemini models). Hidden in site mode. -->
     <div class="modelbar">
-      <div class="select-wrap" id="modelWrap">
-        <select id="modelSelect" title="Model"></select>
+      <div class="combo" id="modelWrap">
+        <input id="modelInput" class="combo-input" type="text" autocomplete="off" spellcheck="false" data-i18n-ph="model.searchPh" placeholder="Search a model…" />
+        <span class="combo-caret">▾</span>
       </div>
+      <button id="modelFilterBtn" class="model-filter-btn" data-i18n-title="filter.title" title="Filter models (provider / price)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7z"/></svg></button>
       <button id="modelConnect" class="btn-grad hidden" data-i18n="model.connect">🔌 Connect a provider</button>
+    </div>
+    <!-- Floating list of models for the searchable combobox. -->
+    <div id="modelMenu" class="combo-menu hidden"></div>
+    <!-- Model filter popover: price tiers + providers (with OpenRouter sub-vendors).
+         The type-to-filter lives in the combobox itself, not here. -->
+    <div id="modelFilterPanel" class="filter-panel hidden">
+      <div class="filter-sec">
+        <div class="filter-sec-head" data-i18n="filter.price">Price</div>
+        <div class="filter-tiers">
+          <label class="ftier-row"><input type="checkbox" class="ftier-cb" value="free" checked /> <span>🎁 <span data-i18n="filter.tierFree">Free</span></span></label>
+          <label class="ftier-row"><input type="checkbox" class="ftier-cb" value="green" checked /> <span>🟢 <span data-i18n="filter.tierGreen">Low cost</span></span></label>
+          <label class="ftier-row"><input type="checkbox" class="ftier-cb" value="yellow" checked /> <span>🟡 <span data-i18n="filter.tierYellow">Affordable</span></span></label>
+          <label class="ftier-row"><input type="checkbox" class="ftier-cb" value="orange" checked /> <span>🟠 <span data-i18n="filter.tierOrange">Moderate</span></span></label>
+          <label class="ftier-row"><input type="checkbox" class="ftier-cb" value="red" checked /> <span>🔴 <span data-i18n="filter.tierRed">Expensive</span></span></label>
+        </div>
+      </div>
+      <div class="filter-sec">
+        <div class="filter-sec-head" data-i18n="filter.providers">Providers</div>
+        <div id="filterProviders" class="filter-providers"></div>
+      </div>
+      <div class="filter-foot">
+        <button id="filterReset" class="link-btn" data-i18n="filter.reset">Reset</button>
+        <button id="filterClose" class="cmp-btn" data-i18n="filter.done">Done</button>
+      </div>
     </div>
 
     <footer class="composer">
-      <textarea id="input" rows="1" data-i18n-ph="composer.ph" placeholder="Write a message…"></textarea>
-      <button id="send" class="btn-grad send" data-i18n-title="send.title" title="Send">➤</button>
-      <button id="stop" class="hidden send" data-i18n-title="stop.title" title="Stop">■</button>
+      <!-- Attachment preview strip (files / images fed to the AI as context). -->
+      <div id="attachStrip" class="attach-strip hidden"></div>
+      <div class="composer-row">
+        <button id="attachBtn" class="comp-icon" data-i18n-title="attach.title" title="Attach files or images">＋</button>
+        <input type="file" id="attachInput" multiple accept="image/*,.pdf,.txt,.md,.markdown,.csv,.json,.log,.html,.xml,.yaml,.yml,.js,.ts,.py,.java,.c,.cpp,.cs,.go,.rb,.rs,.php,.sh,.css" hidden />
+        <textarea id="input" rows="1" data-i18n-ph="composer.ph" placeholder="Write a message…"></textarea>
+        <button id="send" class="btn-grad send" data-i18n-title="send.title" title="Send">➤</button>
+        <button id="stop" class="hidden send" data-i18n-title="stop.title" title="Stop">■</button>
+      </div>
     </footer>
 
       </div><!-- /#workArea -->
