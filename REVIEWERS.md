@@ -59,7 +59,7 @@ optional lint/sign steps.)
 ```bash
 # 1. Get the exact source for this version
 git clone https://github.com/FlorianMartins/ai-sidebar-open-router.git
-cd firefox-ai-sidebar
+cd ai-sidebar-open-router
 git checkout v1.21.1            # use the tag matching the submitted version
 
 # 2. (Optional) verify the third-party libs are the unmodified upstream releases
