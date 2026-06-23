@@ -11,7 +11,7 @@ transpiled, concatenated, minified, bundled or machine-generated. The "build" on
 The **only** minified files are the third-party open-source libraries in `vendor/`,
 shipped **unmodified** from their official releases (verifiable by SHA-256, see below).
 
-- Source repository: https://github.com/FlorianMartins/firefox-ai-sidebar
+- Source repository: https://github.com/FlorianMartins/ai-sidebar-open-router
 - The submitted package corresponds to the git tag matching its `version`
   (e.g. version `1.21.1` → tag `v1.21.1`).
 
@@ -58,7 +58,7 @@ optional lint/sign steps.)
 
 ```bash
 # 1. Get the exact source for this version
-git clone https://github.com/FlorianMartins/firefox-ai-sidebar.git
+git clone https://github.com/FlorianMartins/ai-sidebar-open-router.git
 cd firefox-ai-sidebar
 git checkout v1.21.1            # use the tag matching the submitted version
 
