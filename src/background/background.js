@@ -8,16 +8,53 @@
 // In both cases we drop a pending action into storage.local and open the
 // sidebar, which picks it up and runs it.
 
-const MENU = [
-  { id: "ai-open", title: "Ouvrir AI Sidebar", contexts: ["all"] },
-  { id: "ai-summarize-page", title: "Résumer la page", contexts: ["page"] },
-  { id: "ai-translate-page", title: "Traduire la page", contexts: ["page"] },
-  { id: "ai-summarize-sel", title: "Résumer la sélection", contexts: ["selection"] },
-  { id: "ai-explain", title: "Expliquer la sélection", contexts: ["selection"] },
-  { id: "ai-translate-sel", title: "Traduire la sélection", contexts: ["selection"] },
-  { id: "ai-improve", title: "Améliorer le texte sélectionné", contexts: ["selection"] },
-  { id: "ai-reply", title: "Rédiger une réponse à ce texte", contexts: ["selection", "editable"] },
+// Context-menu items. Contexts are fixed; titles are localised (English default,
+// French when the user picks uiLang="fr" in Settings).
+const MENU_ITEMS = [
+  { id: "ai-open", contexts: ["all"] },
+  { id: "ai-summarize-page", contexts: ["page"] },
+  { id: "ai-translate-page", contexts: ["page"] },
+  { id: "ai-summarize-sel", contexts: ["selection"] },
+  { id: "ai-explain", contexts: ["selection"] },
+  { id: "ai-translate-sel", contexts: ["selection"] },
+  { id: "ai-improve", contexts: ["selection"] },
+  { id: "ai-reply", contexts: ["selection", "editable"] },
 ];
+const MENU_TITLES = {
+  en: {
+    "ai-open": "Open AI Sidebar",
+    "ai-summarize-page": "Summarize the page",
+    "ai-translate-page": "Translate the page",
+    "ai-summarize-sel": "Summarize the selection",
+    "ai-explain": "Explain the selection",
+    "ai-translate-sel": "Translate the selection",
+    "ai-improve": "Improve the selected text",
+    "ai-reply": "Draft a reply to this text",
+  },
+  fr: {
+    "ai-open": "Ouvrir AI Sidebar",
+    "ai-summarize-page": "Résumer la page",
+    "ai-translate-page": "Traduire la page",
+    "ai-summarize-sel": "Résumer la sélection",
+    "ai-explain": "Expliquer la sélection",
+    "ai-translate-sel": "Traduire la sélection",
+    "ai-improve": "Améliorer le texte sélectionné",
+    "ai-reply": "Rédiger une réponse à ce texte",
+  },
+};
+
+async function buildMenus() {
+  let lang = "en";
+  try {
+    const { uiLang } = await browser.storage.local.get("uiLang");
+    lang = uiLang === "fr" ? "fr" : "en";
+  } catch (_) {}
+  const titles = MENU_TITLES[lang] || MENU_TITLES.en;
+  await browser.contextMenus.removeAll();
+  for (const m of MENU_ITEMS) {
+    browser.contextMenus.create({ id: m.id, title: titles[m.id], contexts: m.contexts });
+  }
+}
 
 // Map a menu id to a sidebar quick-action name. Page-level items pass no text,
 // so the sidebar falls back to the current page.
@@ -48,15 +85,18 @@ function openSidebar(tab) {
 }
 
 browser.runtime.onInstalled.addListener(() => {
-  browser.contextMenus.removeAll().then(() => {
-    for (const m of MENU) browser.contextMenus.create(m);
-  });
+  buildMenus();
   // Chromium: make the toolbar action open the side panel.
   try {
     if (typeof chrome !== "undefined" && chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
       chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
     }
   } catch (_) {}
+});
+// Rebuild context menus also on browser startup and whenever the UI language changes.
+if (browser.runtime.onStartup) browser.runtime.onStartup.addListener(() => buildMenus());
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.uiLang) buildMenus();
 });
 
 browser.contextMenus.onClicked.addListener((info, tab) => {

@@ -81,6 +81,11 @@ button { cursor: pointer; }
   background: transparent; border-color: transparent;
   filter: brightness(1.18); transform: translateY(-1px);
 }
+/* Per-glyph optical sizing so History 🕘, New +, and Settings ⚙ read at the same
+   visual weight (the ASCII + is thin, the clock glyph is wide — balance them). */
+#historyBtn.icon-accent { font-size: 20px; }
+#newChat.icon-accent { font-size: 30px; font-weight: 400; }
+#openOptions.icon-accent { font-size: 21px; }
 
 /* ----- Workspace: left activity rail + work area ----- */
 #workspace { flex: 1; min-height: 0; display: flex; }

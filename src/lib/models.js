@@ -43,8 +43,8 @@ export const PROVIDERS = {
     models: [
       ["gpt-4o", "GPT-4o"],
       ["gpt-4o-mini", "GPT-4o mini"],
-      ["o4-mini", "o4-mini (raisonnement)"],
-      ["o3", "o3 (raisonnement)"],
+      ["o4-mini", "o4-mini (reasoning)"],
+      ["o3", "o3 (reasoning)"],
     ],
   },
 
@@ -57,15 +57,29 @@ export const PROVIDERS = {
     keyHint: "sk-or-...",
     canListModels: true,
     supportsWebSearch: true, // universal "web" plugin — works with any model, incl. free ones
+    // Image generation on OpenRouter goes through /chat/completions with image
+    // modalities (NOT /images/generations) — see providers.js. This is what lets an
+    // OpenRouter-only user generate images (e.g. Google's "Nano Banana").
+    supportsImages: true,
+    imageVia: "chat",
+    imageModels: [
+      ["google/gemini-2.5-flash-image-preview", "Gemini 2.5 Flash Image · Nano Banana"],
+      ["google/gemini-2.5-flash-image", "Gemini 2.5 Flash Image"],
+    ],
     models: [
-      ["meta-llama/llama-3.3-70b-instruct:free", "Llama 3.3 70B — gratuit"],
-      ["deepseek/deepseek-r1:free", "DeepSeek R1 — gratuit"],
-      ["deepseek/deepseek-chat:free", "DeepSeek V3 — gratuit"],
-      ["google/gemini-2.0-flash-exp:free", "Gemini 2.0 Flash — gratuit"],
-      ["meta-llama/llama-3.1-8b-instruct:free", "Llama 3.1 8B — gratuit"],
-      ["anthropic/claude-opus-4.1", "Claude Opus 4.1 (payant)"],
-      ["openai/gpt-4o", "GPT-4o (payant)"],
-      ["deepseek/deepseek-r1", "DeepSeek R1 (payant)"],
+      // Strongest RELIABLE free models first. The out-of-the-box default picks the
+      // best one actually available on the account (see sidebar.js bestFreeOpenRouter).
+      // GPT-OSS 120B is currently the most capable + dependable free model; DeepSeek
+      // V3 0324 and Llama 4 Maverick are solid alternates. (Free = rate-limited.)
+      ["openai/gpt-oss-120b:free", "GPT-OSS 120B — free (recommended)"],
+      ["openai/gpt-oss-20b:free", "GPT-OSS 20B — free"],
+      ["deepseek/deepseek-chat-v3-0324:free", "DeepSeek V3 0324 — free"],
+      ["meta-llama/llama-4-maverick:free", "Llama 4 Maverick — free"],
+      ["deepseek/deepseek-r1:free", "DeepSeek R1 — free (reasoning)"],
+      ["google/gemini-2.0-flash-exp:free", "Gemini 2.0 Flash — free"],
+      ["anthropic/claude-opus-4.1", "Claude Opus 4.1 (paid)"],
+      ["openai/gpt-4o", "GPT-4o (paid)"],
+      ["deepseek/deepseek-r1", "DeepSeek R1 (paid)"],
     ],
   },
 
@@ -119,7 +133,7 @@ export const PROVIDERS = {
     keysUrl: "https://platform.deepseek.com/api_keys",
     models: [
       ["deepseek-chat", "DeepSeek V3 (chat)"],
-      ["deepseek-reasoner", "DeepSeek R1 (raisonnement)"],
+      ["deepseek-reasoner", "DeepSeek R1 (reasoning)"],
     ],
   },
 
@@ -131,6 +145,10 @@ export const PROVIDERS = {
     keysUrl: "https://console.x.ai",
     keyHint: "xai-...",
     canListModels: true,
+    supportsImages: true,
+    imageModels: [
+      ["grok-2-image-1212", "Grok 2 Image"],
+    ],
     models: [
       ["grok-2-latest", "Grok 2"],
       ["grok-2-vision-latest", "Grok 2 Vision"],
@@ -160,6 +178,13 @@ export const PROVIDERS = {
     needsKey: true,
     keysUrl: "https://api.together.ai/settings/api-keys",
     canListModels: true,
+    supportsImages: true,
+    imageModels: [
+      ["black-forest-labs/FLUX.1-schnell-Free", "FLUX.1 schnell (free)"],
+      ["black-forest-labs/FLUX.1-schnell", "FLUX.1 schnell"],
+      ["black-forest-labs/FLUX.1-dev", "FLUX.1 dev"],
+      ["black-forest-labs/FLUX.1.1-pro", "FLUX 1.1 Pro"],
+    ],
     models: [
       ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "Llama 3.3 70B Turbo"],
       ["deepseek-ai/DeepSeek-R1", "DeepSeek R1"],
@@ -174,6 +199,11 @@ export const PROVIDERS = {
     needsKey: true,
     keysUrl: "https://fireworks.ai/account/api-keys",
     canListModels: true,
+    supportsImages: true,
+    imageModels: [
+      ["accounts/fireworks/models/flux-1-schnell-fp8", "FLUX.1 schnell"],
+      ["accounts/fireworks/models/flux-1-dev-fp8", "FLUX.1 dev"],
+    ],
     models: [
       ["accounts/fireworks/models/llama-v3p3-70b-instruct", "Llama 3.3 70B"],
       ["accounts/fireworks/models/deepseek-r1", "DeepSeek R1"],
@@ -188,6 +218,11 @@ export const PROVIDERS = {
     needsKey: true,
     keysUrl: "https://deepinfra.com/dash/api_keys",
     canListModels: true,
+    supportsImages: true,
+    imageModels: [
+      ["black-forest-labs/FLUX-1-schnell", "FLUX.1 schnell"],
+      ["black-forest-labs/FLUX-1-dev", "FLUX.1 dev"],
+    ],
     models: [
       ["meta-llama/Llama-3.3-70B-Instruct", "Llama 3.3 70B"],
       ["deepseek-ai/DeepSeek-R1", "DeepSeek R1"],
@@ -242,11 +277,11 @@ export const PROVIDERS = {
     local: true,
     canListModels: true,
     keysUrl: "https://lmstudio.ai",
-    models: [["local-model", "(modèle chargé dans LM Studio)"]],
+    models: [["local-model", "(model loaded in LM Studio)"]],
   },
 
   custom: {
-    label: "Personnalisé (compatible OpenAI)",
+    label: "Custom (OpenAI-compatible)",
     kind: "openai",
     baseUrl: "",
     needsKey: false,

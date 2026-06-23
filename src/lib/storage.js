@@ -39,7 +39,11 @@ const DEFAULTS = {
   localEnabled: {}, // explicit opt-in for local servers { ollama:true, lmstudio:true }
   maxPageChars: 12000, // truncation budget for a single page's text
   targetLang: "French", // preferred target language for translations (canonical English name)
-  responseLang: "English", // language the AI replies in (default: English)
+  responseLang: "Auto", // language the AI replies in. "Auto" = match the user's input language.
+                        // (The UI language is separate — see uiLang.)
+  orFreeOnly: false, // OpenRouter model picker: show ALL models with their price-tier colours
+                     // (🎁🟢🟡🟠🔴) by default. Free-only is an opt-in toggle in Settings.
+                     // Inaccessible models are auto-removed on error + a data-policy link is shown.
   improvePreset: "improve", // default writing preset for the "improve" mode
   uiLang: "en", // sidebar interface language: "en" (default) | "fr". Changed from Settings.
 
@@ -96,7 +100,23 @@ function migrate(s) {
 
 export async function getSettings() {
   const stored = await browser.storage.local.get(null);
-  return migrate({ ...DEFAULTS, ...stored });
+  const s = migrate({ ...DEFAULTS, ...stored });
+  // One-time migration (persisted): the old default forced English replies. Switch
+  // it to "Auto" (match the input language) ONCE, so users who never changed it get
+  // the expected behaviour, while anyone who later picks a language keeps it.
+  if (s.responseLang === "English" && !s.respLangMigrated) {
+    s.responseLang = "Auto";
+    s.respLangMigrated = true;
+    try { await browser.storage.local.set({ responseLang: "Auto", respLangMigrated: true }); } catch (_) {}
+  }
+  // One-time: the earlier build defaulted to free-only, which hid paid models and made
+  // every shown model the same green. Flip it off once so the full coloured list returns.
+  if (s.orFreeOnly === true && !s.orFreeOnlyMigrated) {
+    s.orFreeOnly = false;
+    s.orFreeOnlyMigrated = true;
+    try { await browser.storage.local.set({ orFreeOnly: false, orFreeOnlyMigrated: true }); } catch (_) {}
+  }
+  return s;
 }
 
 export async function setSettings(patch) {

@@ -239,25 +239,33 @@
     return (main.innerText || "").replace(/\n{3,}/g, "\n\n").slice(0, 12000);
   }
 
+  // Webmail button labels — English by default, French when uiLang="fr".
+  const WEBMAIL_I18N = {
+    en: { reply: "✨ Reply with AI", aria: "Draft an AI-assisted reply", opening: "✓ Opening the sidebar…" },
+    fr: { reply: "✨ Répondre avec l'IA", aria: "Rédiger une réponse assistée par IA", opening: "✓ Ouvre la sidebar…" },
+  };
+  let WM = WEBMAIL_I18N.en;
+
   function injectWebmailButton() {
     if (document.getElementById("__ai_reply_fab")) return;
     const btn = document.createElement("button");
     btn.id = "__ai_reply_fab";
     btn.type = "button";
-    btn.textContent = "✨ Répondre avec l'IA";
-    btn.setAttribute("aria-label", "Rédiger une réponse assistée par IA");
+    btn.textContent = WM.reply;
+    btn.setAttribute("aria-label", WM.aria);
     Object.assign(btn.style, {
       position: "fixed", right: "18px", bottom: "18px", zIndex: 2147483647,
       padding: "10px 14px", borderRadius: "999px", border: "0",
-      background: "#c8643c", color: "#fff", font: "600 13px system-ui, sans-serif",
-      boxShadow: "0 4px 14px rgba(0,0,0,.25)", cursor: "pointer",
+      background: "linear-gradient(135deg,#6366f1 0%,#8b5cf6 55%,#a855f7 100%)",
+      color: "#fff", font: "600 13px system-ui, sans-serif",
+      boxShadow: "0 4px 14px rgba(124,58,237,.35)", cursor: "pointer",
     });
     btn.addEventListener("click", () => {
       const thread = readThread();
       // Hand the thread to the sidebar via a pending action; it drafts a reply.
       browser.runtime.sendMessage({ type: "draft_reply", thread, url: location.href });
-      btn.textContent = "✓ Ouvre la sidebar…";
-      setTimeout(() => (btn.textContent = "✨ Répondre avec l'IA"), 2500);
+      btn.textContent = WM.opening;
+      setTimeout(() => (btn.textContent = WM.reply), 2500);
     });
     document.documentElement.appendChild(btn);
   }
@@ -265,8 +273,9 @@
   function maybeSetupWebmail() {
     if (!isWebmail()) return;
     try {
-      browser.storage.local.get("webmailAssist").then((s) => {
+      browser.storage.local.get(["webmailAssist", "uiLang"]).then((s) => {
         if (s.webmailAssist === false) return;
+        WM = WEBMAIL_I18N[s.uiLang === "fr" ? "fr" : "en"];
         injectWebmailButton();
       });
     } catch (_) {

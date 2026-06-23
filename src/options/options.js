@@ -3,6 +3,7 @@ import { PROVIDERS, PROVIDER_ORDER, IMAGE_SIZES, WRITING_PRESETS, isConnected } 
 import { connectOpenRouter } from "../lib/auth.js";
 import { listModels } from "../lib/providers.js";
 import { clearConversations } from "../lib/history.js";
+import { t, setLang, applyDom } from "../lib/i18n.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -54,7 +55,7 @@ function modelOptionsFor(id) {
   const labels = new Map(PROVIDERS[id].models);
   const ids = fetched.length ? fetched : PROVIDERS[id].models.map((m) => m[0]);
   const seen = new Set();
-  const out = [["", "(défaut automatique)"]];
+  const out = [["", t("opt.model.auto")]];
   for (const m of ids) {
     if (seen.has(m)) continue;
     seen.add(m);
@@ -87,10 +88,10 @@ function buildCard(id) {
   const sec = el("section", "provider-card");
 
   const head = el("div", "provider-head");
-  head.appendChild(el("h3", null, meta.label + (meta.local ? "  (local)" : "")));
+  head.appendChild(el("h3", null, meta.label + (meta.local ? t("opt.localSuffix") : "")));
   const badge = el("span", "badge");
   head.appendChild(badge);
-  if (FREE_TIER.has(id)) head.appendChild(el("span", "badge free", "gratuit dispo"));
+  if (FREE_TIER.has(id)) head.appendChild(el("span", "badge free", t("opt.badge.free")));
   sec.appendChild(head);
 
   // Connect affordance on EVERY cloud provider. P8 — the badge AND this button now
@@ -101,22 +102,21 @@ function buildCard(id) {
     connectBtn = el("button", "small connect");
     connectBtn.addEventListener("click", () => connectAccount(id));
     sec.appendChild(connectBtn);
-    sec.appendChild(el("p", "muted hint", OAUTH.has(id)
-      ? "Compte (Google / GitHub / email) → débloque tous les modèles, y compris gratuits."
-      : "Ouvre la page de connexion du fournisseur : identifiez-vous avec VOTRE compte, créez une clé API, puis collez-la ci-dessous. (Un abonnement type ChatGPT Plus / Claude Pro ne donne pas accès à l'API — il faut une clé.)"));
+    sec.appendChild(el("p", "muted hint", OAUTH.has(id) ? t("opt.hint.oauth") : t("opt.hint.key")));
   }
 
   // Reflect connected/disconnected state on the badge + connect button.
   const applyConnState = (connectedNow) => {
     badge.className = "badge " + (connectedNow ? "ok" : "off");
-    badge.textContent = connectedNow ? "✅ Connecté(e)" : "○ Non connecté";
+    badge.textContent = connectedNow ? t("opt.badge.connected") : t("opt.badge.off");
+    if (id === "openrouter") updateQuickConnect(connectedNow);
     if (!connectBtn) return;
     if (connectedNow) {
       connectBtn.className = "ghost small connect connected";
-      connectBtn.textContent = OAUTH.has(id) ? "✓ Connecté — reconnecter mon compte" : "✓ Connecté — reconnecter " + meta.label;
+      connectBtn.textContent = OAUTH.has(id) ? t("opt.connect.oauthReconnect") : t("opt.connect.keyReconnect", { label: meta.label });
     } else {
       connectBtn.className = "grad small connect";
-      connectBtn.textContent = OAUTH.has(id) ? "🔐 Se connecter avec mon compte" : "🔐 Se connecter à mon compte " + meta.label;
+      connectBtn.textContent = OAUTH.has(id) ? t("opt.connect.oauth") : t("opt.connect.key", { label: meta.label });
     }
   };
   applyConnState(isConnected(id, settings));
@@ -131,17 +131,17 @@ function buildCard(id) {
     inp.addEventListener("change", () => applyConnState(inp.checked));
     lab.appendChild(inp);
     lab.appendChild(el("span", "track"));
-    lab.appendChild(el("span", "lbl", "Activer ce serveur local (lancé sur ma machine)"));
+    lab.appendChild(el("span", "lbl", t("opt.local.enable")));
     sec.appendChild(lab);
   }
 
   // API key.
   if (meta.needsKey || id === "custom") {
-    const lab = el("label", null, meta.needsKey ? "Clé API" : "Clé API (optionnelle)");
+    const lab = el("label", null, meta.needsKey ? t("opt.key.label") : t("opt.key.labelOpt"));
     const inp = el("input");
     inp.type = "password";
     inp.id = `key_${id}`;
-    inp.placeholder = meta.keyHint || "clé…";
+    inp.placeholder = meta.keyHint || "key…";
     inp.value = (settings.keys && settings.keys[id]) || "";
     // Live feedback: a non-empty key counts as "Connecté(e)" immediately (P8).
     inp.addEventListener("input", () => applyConnState(!!inp.value.trim() || isConnected(id, settings)));
@@ -149,7 +149,7 @@ function buildCard(id) {
     sec.appendChild(lab);
     if (meta.keysUrl) {
       const p = el("p", "muted");
-      const tag = FREE_TIER.has(id) ? "Obtenir une clé (offre gratuite) : " : "Console du fournisseur : ";
+      const tag = FREE_TIER.has(id) ? t("opt.key.getFree") : t("opt.key.console");
       p.innerHTML = `${tag}<a href="${meta.keysUrl}" target="_blank" rel="noreferrer">${meta.keysUrl.replace(/^https?:\/\//, "")}</a>`;
       sec.appendChild(p);
     }
@@ -157,18 +157,18 @@ function buildCard(id) {
 
   // Base URL (local / custom).
   if (meta.local || meta.custom) {
-    const lab = el("label", null, "URL de base");
+    const lab = el("label", null, t("opt.url.label"));
     const inp = el("input");
     inp.type = "text";
     inp.id = `url_${id}`;
-    inp.placeholder = meta.baseUrl || "https://votre-serveur/v1";
+    inp.placeholder = meta.baseUrl || "https://your-server/v1";
     inp.value = (settings.baseUrls && settings.baseUrls[id]) || "";
     lab.appendChild(inp);
     sec.appendChild(lab);
   }
 
   // Default model — dropdown of currently available models.
-  const lab = el("label", null, "Modèle par défaut");
+  const lab = el("label", null, t("opt.model.default"));
   const sel = el("select");
   sel.id = `model_${id}`;
   lab.appendChild(sel);
@@ -178,8 +178,6 @@ function buildCard(id) {
   return sec;
 }
 
-const GROUP_TITLES = { cloud: "Fournisseurs (compte / clé API)", local: "Modèles locaux", custom: "Serveur personnalisé" };
-
 function buildProviderFields() {
   const root = $("providers");
   root.innerHTML = "";
@@ -187,7 +185,7 @@ function buildProviderFields() {
   for (const id of PROVIDER_ORDER) {
     const cat = category(id);
     if (cat !== lastCat) {
-      root.appendChild(el("h2", "group-title", GROUP_TITLES[cat]));
+      root.appendChild(el("h2", "group-title", t("opt.group." + cat)));
       lastCat = cat;
     }
     root.appendChild(buildCard(id));
@@ -217,7 +215,7 @@ function buildAgentModelSelect() {
   const sel = $("agentModel");
   if (!sel) return;
   sel.innerHTML = "";
-  const auto = el("option", null, "Auto (modèle sélectionné dans la sidebar)");
+  const auto = el("option", null, t("opt.agent.auto"));
   auto.value = "";
   sel.appendChild(auto);
   for (const id of PROVIDER_ORDER) {
@@ -243,7 +241,7 @@ function buildSearchModelSelect() {
   const sel = $("searchModel");
   if (!sel) return;
   sel.innerHTML = "";
-  const auto = el("option", null, "Auto (Perplexity / modèle gratuit + web)");
+  const auto = el("option", null, t("opt.search.auto"));
   auto.value = "";
   sel.appendChild(auto);
   for (const id of PROVIDER_ORDER) {
@@ -280,20 +278,38 @@ async function refreshModelLists() {
   await setSettings({ modelLists: { ...(settings.modelLists || {}), ...modelLists } });
 }
 
+// Reflect the OpenRouter quick-connect button state at the top of the page (it used
+// to stay "Connect…" even once connected).
+function updateQuickConnect(connectedNow) {
+  const btn = $("quickConnect");
+  if (!btn) return;
+  if (connectedNow) {
+    btn.className = "ghost";
+    btn.textContent = t("opt.quick.btnConnected");
+  } else {
+    btn.className = "grad";
+    btn.textContent = t("opt.quick.btn");
+  }
+}
+
 async function load() {
   settings = await getSettings();
+  setLang(settings.uiLang || "en");       // English default; French via the uiLang setting
+  applyDom(document);                      // fill all data-i18n static markup
+  document.documentElement.lang = settings.uiLang === "fr" ? "fr" : "en";
   modelLists = { ...(settings.modelLists || {}) };
   buildProviderFields();
   buildImageProvider();
   buildSearchModelSelect();
   buildAgentModelSelect();
-  fillSelect($("responseLang"), LANGUAGES.map((l) => [l, l]), settings.responseLang || "English");
-  fillSelect($("improvePreset"), WRITING_PRESETS.map((p) => [p[0], p[1]]), settings.improvePreset || "improve");
+  fillSelect($("responseLang"), [["Auto", t("opt.lang.respAuto")], ...LANGUAGES.map((l) => [l, l])], settings.responseLang || "Auto");
+  fillSelect($("improvePreset"), WRITING_PRESETS.map((p) => [p[0], t("preset." + p[0])]), settings.improvePreset || "improve");
+  updateQuickConnect(isConnected("openrouter", settings));
   $("imageModel").value = settings.imageModel || "";
   $("uiLang").value = settings.uiLang || "en";
   $("targetLang").value = settings.targetLang || "French";
-  $("thinking").checked = settings.thinking;
   $("webSearch").checked = settings.webSearch;
+  $("orFreeOnly").checked = settings.orFreeOnly !== false;
   $("agentPermission").value = settings.agentPermission || "manual";
   $("codeAppUrl").value = settings.codeAppUrl != null ? settings.codeAppUrl : "";
   $("blockPayments").checked = settings.blockPayments;
@@ -329,8 +345,8 @@ async function save() {
     uiLang: $("uiLang").value === "fr" ? "fr" : "en",
     responseLang: $("responseLang").value,
     targetLang: $("targetLang").value.trim() || "French",
-    thinking: $("thinking").checked,
     webSearch: $("webSearch").checked,
+    orFreeOnly: $("orFreeOnly").checked,
     searchModel: $("searchModel").value,
     agentModel: $("agentModel").value,
     agentPermission: $("agentPermission").value,
@@ -351,7 +367,7 @@ async function save() {
   buildSearchModelSelect();
   buildAgentModelSelect();
   refreshModelLists();
-  flash($("status"), "✓ Enregistré.");
+  flash($("status"), t("opt.saved"));
 }
 
 function flash(node, text) {
@@ -364,7 +380,7 @@ function flash(node, text) {
 async function connectAccount(id) {
   const status = $("status");
   if (OAUTH.has(id)) {
-    status.textContent = "Connexion…";
+    status.textContent = t("opt.dyn.connecting");
     try {
       const key = await connectOpenRouter();
       const cur = await getSettings();
@@ -372,9 +388,9 @@ async function connectAccount(id) {
       cur.keys[id] = key;
       await setSettings({ keys: cur.keys, provider: id });
       await load();
-      flash(status, "✓ Connecté à " + PROVIDERS[id].label + ".");
+      flash(status, t("opt.dyn.connected", { label: PROVIDERS[id].label }));
     } catch (e) {
-      flash(status, "Échec : " + (e && e.message ? e.message : e));
+      flash(status, t("opt.dyn.failed", { msg: e && e.message ? e.message : e }));
     }
     return;
   }
@@ -385,18 +401,18 @@ async function connectAccount(id) {
   if (url) window.open(url, "_blank", "noopener");
   const f = $(`key_${id}`);
   if (f) { f.focus(); f.scrollIntoView({ block: "center" }); }
-  flash(status, "Identifiez-vous chez " + meta.label + ", créez une clé API, puis collez-la.");
+  flash(status, t("opt.dyn.identify", { label: meta.label }));
 }
 
 $("save").addEventListener("click", save);
 $("quickConnect").addEventListener("click", async () => {
-  flash($("quickStatus"), "Connexion…");
+  flash($("quickStatus"), t("opt.dyn.connecting"));
   await connectAccount("openrouter");
-  flash($("quickStatus"), isConnected("openrouter", settings) ? "✓ Connecté — clé enregistrée ci-dessous." : "");
+  flash($("quickStatus"), isConnected("openrouter", settings) ? t("opt.quick.savedNote") : "");
 });
 $("clearHistoryBtn").addEventListener("click", async () => {
   await clearConversations();
-  flash($("status"), "✓ Historique effacé.");
+  flash($("status"), t("opt.cleared"));
 });
 
 // Reflect connections made elsewhere (e.g. the sidebar's quick-connect): when the

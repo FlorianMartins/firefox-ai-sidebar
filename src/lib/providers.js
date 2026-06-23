@@ -325,12 +325,17 @@ export async function listOpenRouterRich(settings) {
   const res = await fetch(baseUrl.replace(/\/$/, "") + "/models", { headers });
   await ensureOk(res);
   const json = await res.json();
-  return (json.data || []).map((m) => ({
-    id: m.id,
-    name: m.name || m.id,
-    prompt: parseFloat((m.pricing && m.pricing.prompt) || "0"),
-    completion: parseFloat((m.pricing && m.pricing.completion) || "0"),
-  }));
+  return (json.data || []).map((m) => {
+    const outMods = (m.architecture && m.architecture.output_modalities) || [];
+    return {
+      id: m.id,
+      name: m.name || m.id,
+      prompt: parseFloat((m.pricing && m.pricing.prompt) || "0"),
+      completion: parseFloat((m.pricing && m.pricing.completion) || "0"),
+      // Can this model OUTPUT images? (used to populate the Image tab dynamically)
+      image: Array.isArray(outMods) && outMods.includes("image"),
+    };
+  });
 }
 
 // -------- Dynamic model listing (OpenAI /models format) ---------------------
@@ -379,6 +384,14 @@ export async function generateImage(settings, { prompt, size, signal }) {
   const apiKey = keyFor(providerId, settings);
   if (meta.needsKey && !apiKey) throw new Error(`Clé API manquante pour ${meta.label}.`);
 
+  // Some providers (OpenRouter, Google) generate images through the chat-completions
+  // API with image "modalities" rather than /images/generations. Those models have
+  // no size parameter, so — as requested — we pass the size to the model as a plain
+  // INSTRUCTION inside the prompt.
+  if (meta.imageVia === "chat") {
+    return generateImageViaChat({ baseUrl, apiKey, providerId, model: settings.imageModel || (meta.imageModels && meta.imageModels[0][0]), prompt, size, signal });
+  }
+
   const body = {
     model: settings.imageModel || (meta.imageModels && meta.imageModels[0][0]),
     prompt,
@@ -402,5 +415,42 @@ export async function generateImage(settings, { prompt, size, signal }) {
     else if (item.url) out.push(item.url);
   }
   if (!out.length) throw new Error("Aucune image renvoyée par l'API.");
+  return out;
+}
+
+// Image generation through the chat-completions API with image modalities
+// (OpenRouter, Google "Nano Banana", etc.). These models have no size parameter,
+// so the requested size is appended to the prompt as an instruction. Returns a
+// list of data: / http image URLs.
+async function generateImageViaChat({ baseUrl, apiKey, providerId, model, prompt, size, signal }) {
+  const url = baseUrl.replace(/\/$/, "") + "/chat/completions";
+  const headers = { "content-type": "application/json" };
+  if (apiKey) headers.authorization = `Bearer ${apiKey}`;
+  if (providerId === "openrouter") {
+    headers["HTTP-Referer"] = "https://github.com/FlorianMartins/firefox-ai-sidebar";
+    headers["X-Title"] = "AI Sidebar";
+  }
+  const sizeHint = size ? ` Target size/aspect: ${size} pixels.` : "";
+  const body = {
+    model,
+    modalities: ["image", "text"],
+    messages: [{ role: "user", content: `Generate an image: ${prompt}.${sizeHint}` }],
+  };
+  const res = await fetch(url, { method: "POST", signal, headers, body: JSON.stringify(body) });
+  await ensureOk(res);
+  const json = await res.json();
+  const out = [];
+  const msg = json.choices && json.choices[0] && json.choices[0].message;
+  // OpenRouter/Gemini return generated images under message.images[].image_url.url
+  for (const im of (msg && msg.images) || []) {
+    const u = im && (im.image_url ? im.image_url.url : im.url);
+    if (u) out.push(u);
+  }
+  // Some return a data URL directly in the content.
+  if (!out.length && typeof (msg && msg.content) === "string") {
+    const m = msg.content.match(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+/);
+    if (m) out.push(m[0]);
+  }
+  if (!out.length) throw new Error("Aucune image renvoyée par le modèle (essayez un autre modèle d'image).");
   return out;
 }

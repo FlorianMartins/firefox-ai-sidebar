@@ -17,7 +17,7 @@ import { connectOpenRouter } from "../lib/auth.js";
 import { t, setLang, applyDom } from "../lib/i18n.js";
 import {
   listConversations, getConversation, saveConversation, deleteConversation,
-  clearConversations, newConversationId, titleFrom,
+  newConversationId, titleFrom,
 } from "../lib/history.js";
 
 const $ = (id) => document.getElementById(id);
@@ -82,6 +82,10 @@ let abortController = null;
 let currentPage = null;
 let busy = false;
 let mode = "chat";
+// OpenRouter models discovered to be inaccessible on this account (e.g. data-policy
+// gated, no free endpoint). Session-only: removed from the picker as we hit them, and
+// reset on reload — so after fixing the account they all come back.
+const orUnavailable = new Set();
 // Last primary turn (to re-run on another model for the "compare" button).
 let lastUserContent = "";
 let lastRunMode = "chat";
@@ -91,6 +95,54 @@ let lastForceWeb = false;
 // scrollback, independent from the chat. `cmds`/`cmdIdx` drive ↑/↓ recall.
 const term = { native: [], lines: [], cmds: [], cmdIdx: 0, booted: false };
 
+// Per-workspace isolation: Chat, Agent, Translate, Improve and Image each keep
+// their OWN live conversation AND their own saved-conversation history (the two
+// are distinct). Terminal and Code have dedicated panes and are not chat-area
+// modes. We swap the live globals (history/transcript/convId/…) in and out of a
+// per-mode session whenever the workspace changes.
+const CHAT_MODES = ["chat", "agent", "translate", "improve", "image"];
+const sessions = {}; // mode -> { history, transcript, convId, lastUserContent, lastRunMode, lastForceWeb }
+function blankSession(m) {
+  return { history: [], transcript: [], convId: newConversationId(), lastUserContent: "", lastRunMode: m, lastForceWeb: false, nodes: null };
+}
+// Visual persistence per tab: instead of re-deriving the DOM from `transcript`
+// (which can drop streamed/enhanced content and the compare bars), we DETACH the
+// actual message nodes when leaving a tab and RE-ATTACH them on return — nodes keep
+// their event listeners, compare bars and live artifact iframes intact.
+function stashMode(m) {
+  if (!CHAT_MODES.includes(m)) return;
+  const s = getSession(m);
+  s.nodes = Array.from(els.messages.children).filter((n) => n.id !== "empty");
+  s.nodes.forEach((n) => n.remove());
+}
+function restoreMode(m) {
+  clearMessages();
+  const s = getSession(m);
+  if (s.nodes && s.nodes.length) {
+    els.empty.classList.add("hidden");
+    s.nodes.forEach((n) => els.messages.appendChild(n));
+  } else {
+    els.empty.classList.remove("hidden");
+  }
+  updateEmptyState();
+}
+function getSession(m) { return sessions[m] || (sessions[m] = blankSession(m)); }
+// Copy the live globals into a mode's session (before leaving it, or after we
+// reassign any global to a brand-new array — in-place .push keeps refs in sync).
+function syncSessionFromGlobals(m) {
+  if (!CHAT_MODES.includes(m)) return;
+  const s = getSession(m);
+  s.history = history; s.transcript = transcript; s.convId = convId;
+  s.lastUserContent = lastUserContent; s.lastRunMode = lastRunMode; s.lastForceWeb = lastForceWeb;
+}
+// Load a mode's session into the live globals.
+function loadSessionToGlobals(m) {
+  const s = getSession(m);
+  history = s.history; transcript = s.transcript; convId = s.convId;
+  lastUserContent = s.lastUserContent; lastRunMode = s.lastRunMode; lastForceWeb = s.lastForceWeb;
+}
+// Re-render the chat area from the active session's transcript (used when the
+// workspace changes), re-attaching the per-message "compare" bar on the last answer.
 // Composer placeholder for a workspace — resolved live so it follows the UI language.
 function placeholderFor(m) { return t("ph." + m) || t("ph.chat"); }
 
@@ -192,9 +244,15 @@ function labelForValue(value) {
 
 // OpenRouter hierarchy: one optgroup per vendor (OpenRouter › vendor › model+cost),
 // each option prefixed with a price-tier dot (🎁 for free).
+function orModelVisible(m) {
+  if (orUnavailable.has(m.id)) return false;               // discovered as inaccessible this session
+  if (settings.orFreeOnly && (m.prompt || m.completion)) return false; // free-only mode hides paid
+  return true;
+}
 function fillOpenRouterGroups(sel) {
   const byVendor = {};
   for (const m of settings.orModels) {
+    if (!orModelVisible(m)) continue;
     const vendor = (m.id.split("/")[0] || "autres");
     (byVendor[vendor] = byVendor[vendor] || []).push(m);
   }
@@ -257,8 +315,17 @@ function imageModelChoices() {
   const out = [];
   for (const pid of PROVIDER_ORDER) {
     const meta = PROVIDERS[pid];
-    if (!meta.supportsImages || !meta.imageModels) continue;
     if (currentKeyMissing(pid)) continue; // only connected providers
+    // OpenRouter: list EVERY model that can output images (Gemini/Nano Banana, etc.),
+    // pulled live from the account's model list — far more than a hard-coded handful.
+    if (pid === "openrouter" && settings.orModels && settings.orModels.length) {
+      const dyn = settings.orModels.filter((m) => m.image && !orUnavailable.has(m.id));
+      if (dyn.length) {
+        for (const m of dyn) out.push([pid, m.id, prettifyORName(m)]);
+        continue;
+      }
+    }
+    if (!meta.supportsImages || !meta.imageModels) continue;
     for (const [mid, mlabel] of meta.imageModels) out.push([pid, mid, mlabel]);
   }
   return out;
@@ -267,11 +334,10 @@ function populateImageModelSelector() {
   const sel = els.modelSelect;
   sel.innerHTML = "";
   const list = imageModelChoices();
-  els.modelWrap.classList.remove("hidden");
-  // BUGFIX (P6): the connect button used to show whenever there was no IMAGE model,
-  // even with another provider (e.g. OpenRouter) already connected — confusing. Now
-  // it only shows when NOTHING is connected at all; otherwise we show an inline hint.
+  // Same rule as the chat picker: with NOTHING connected, hide the list and show
+  // only the full-width Connect button. With a provider connected, show the list.
   const anyConnected = connectedProviders(settings).length > 0;
+  els.modelWrap.classList.toggle("hidden", !anyConnected);
   els.modelConnect.classList.toggle("hidden", anyConnected || list.length > 0);
   if (!list.length) {
     const o = document.createElement("option");
@@ -293,16 +359,40 @@ function populateImageModelSelector() {
     sel.appendChild(o);
   }
   sel.value = cur;
-  if (!sel.value) sel.value = list[0][0] + "|" + list[0][1];
+  // If the stored image provider/model isn't among the CONNECTED image models
+  // (e.g. default is OpenAI but the user only connected OpenRouter), fall back to
+  // the first available one AND persist it, so "Generate" doesn't fail with a
+  // "key missing for OpenAI" against an unselected provider.
+  if (!sel.value) {
+    sel.value = list[0][0] + "|" + list[0][1];
+    const fb = parseSel(sel.value);
+    settings.imageProvider = fb.providerId;
+    settings.imageModel = fb.modelId;
+    setSettings({ imageProvider: fb.providerId, imageModel: fb.modelId });
+    updateImageNote();
+  }
   updateEmptyState();
 }
 
 // Approximate cost tier per image model (these endpoints don't expose token pricing
 // the way chat models do, so we annotate from each model's published per-image price).
 function imagePriceTier(pid, mid) {
+  // OpenRouter image models: use the model's REAL pricing → 🎁 free / coloured tiers,
+  // exactly like the chat lists in the other tabs.
+  if (pid === "openrouter" && settings.orModels) {
+    const om = settings.orModels.find((x) => x.id === mid);
+    if (om) { const tt = priceTier(om); return { emoji: tt.emoji, color: tt.color, note: orCost(om) }; }
+  }
   const m = (mid || "").toLowerCase();
+  // Free first.
+  if (m.includes("schnell-free") || m.includes("schnell_free")) return { emoji: "🎁", color: "#34d399", note: "free" };
   if (m.includes("dall-e-2")) return { emoji: "🟢", color: "#34d399", note: "~$0.02/image" };
+  if (m.includes("schnell")) return { emoji: "🟢", color: "#34d399", note: "~$0.003/image" };
+  if (m.includes("sd3") || m.includes("sd-3") || m.includes("stable")) return { emoji: "🟢", color: "#34d399", note: "~$0.01/image" };
+  if (m.includes("flux") && m.includes("dev")) return { emoji: "🟡", color: "#fbbf24", note: "~$0.025/image" };
   if (m.includes("dall-e-3")) return { emoji: "🟡", color: "#fbbf24", note: "~$0.04–0.12/image" };
+  if (m.includes("grok")) return { emoji: "🟡", color: "#fbbf24", note: "~$0.07/image" };
+  if (m.includes("flux") && m.includes("pro")) return { emoji: "🟠", color: "#fb923c", note: "~$0.04/image" };
   if (m.includes("gpt-image")) return { emoji: "🟠", color: "#fb923c", note: "~$0.04–0.17/image" };
   return { emoji: "⚪", color: "#9aa0b4", note: t("image.tierDefault") };
 }
@@ -315,8 +405,12 @@ function refreshModelUI() {
 
 function populateModelSelector() {
   const connected = connectedProviders(settings);
-  els.modelConnect.classList.toggle("hidden", connected.length > 0);
-  els.modelWrap.classList.remove("hidden");
+  const none = connected.length === 0;
+  // Nothing connected yet → hide the model list entirely and show ONLY the
+  // full-width "Connect a provider" button. Once at least one provider is
+  // connected, show the (full-width) model list and hide the button. (All tabs.)
+  els.modelConnect.classList.toggle("hidden", !none);
+  els.modelWrap.classList.toggle("hidden", none);
   let val = "";
   if (connected.length) {
     const pid = connected.includes(settings.provider) ? settings.provider : connected[0];
@@ -432,6 +526,29 @@ async function doFreeConnect() {
   }
 }
 
+// Choose the MOST POWERFUL free OpenRouter model that's actually available on the
+// account, ranked by a curated preference (DeepSeek R1 first, then V3, Llama 70B…).
+// Falls back to any free model, then any model.
+function bestFreeOpenRouter(rich) {
+  const free = rich.filter((m) => !m.prompt && !m.completion && !orUnavailable.has(m.id));
+  if (!free.length) {
+    const any = rich.filter((m) => !orUnavailable.has(m.id));
+    return any.length ? any[0].id : "";
+  }
+  const PREF = [
+    "gpt-oss-120b", "gpt-oss-20b",
+    "deepseek-chat-v3", "deepseek/deepseek-chat", "deepseek-v3",
+    "llama-4-maverick", "llama-4-scout", "qwen3",
+    "nemotron", "deepseek-r1",
+    "gemini-2.0-flash", "llama-3.3-70b", "70b",
+  ];
+  for (const p of PREF) {
+    const hit = free.find((m) => m.id.toLowerCase().includes(p));
+    if (hit) return hit.id;
+  }
+  return free[0].id;
+}
+
 // Best-effort: fetch the real available model list for every connected provider.
 // OpenRouter gets a richer fetch (vendor + display name + pricing) for the
 // hierarchical menu.
@@ -447,6 +564,20 @@ async function autoListConnected() {
           if (rich && rich.length) {
             settings.orModels = rich;
             settings.modelLists[pid] = rich.map((m) => m.id);
+            // FIX: the hard-coded default free model (e.g. llama-3.3-70b:free) is
+            // often unavailable/renamed on a given account, so it silently fails.
+            // Pick a free model that ACTUALLY exists in this account's live list
+            // (falling back to the first model) whenever the current choice isn't
+            // in the list. This makes the out-of-the-box free default just work.
+            const chosen = settings.models && settings.models.openrouter;
+            const inList = chosen && rich.some((m) => m.id === chosen);
+            if (!inList) {
+              const pick = bestFreeOpenRouter(rich);
+              if (pick) {
+                settings.models = { ...(settings.models || {}), openrouter: pick };
+                await setSettings({ models: settings.models });
+              }
+            }
           }
         } else {
           const list = await listModels(pid, settings);
@@ -461,9 +592,14 @@ async function autoListConnected() {
 
 // ----- Workspace modes ------------------------------------------------------
 function setMode(next) {
+  const prev = mode;
+  // Save the conversation we're leaving (data + DOM nodes), then point the globals
+  // at the target workspace's own conversation.
+  if (prev !== next && CHAT_MODES.includes(prev)) { syncSessionFromGlobals(prev); stashMode(prev); }
   mode = next;
   settings.mode = next;
   setSettings({ mode: next });
+  if (CHAT_MODES.includes(next)) loadSessionToGlobals(next);
   els.rail.querySelectorAll(".railtab").forEach((b) => b.classList.toggle("active", b.dataset.mode === next));
   // Chat + Agent share the chat composer & the Réflexion/Web/Page chips.
   els.chatControls.classList.toggle("hidden", !(next === "chat" || next === "agent"));
@@ -476,6 +612,7 @@ function setMode(next) {
   els.codeView.classList.toggle("hidden", next !== "code");
   els.input.placeholder = placeholderFor(next);
   refreshModelUI(); // Image tab lists image models; others list chat models.
+  if (CHAT_MODES.includes(next)) restoreMode(next); // re-attach this tab's own message nodes
   if (next === "terminal") {
     termBoot();
     setTimeout(() => els.termInput.focus(), 0);
@@ -651,17 +788,23 @@ function debouncedRefresh() {
   refreshTimer = setTimeout(refreshCurrentPage, 350);
 }
 async function refreshCurrentPage() {
+  let ok = false;
   try {
     const page = await executeTool("read_page", {}, {});
     if (page && !page.error && page.url) {
       currentPage = page;
       els.pageTitle.textContent = page.title || page.url;
-      els.pageBar.classList.toggle("hidden", !els.pageCtx.checked);
-      return;
+      ok = true;
     }
   } catch (_) {}
-  currentPage = null;
-  els.pageBar.classList.add("hidden");
+  if (!ok) {
+    currentPage = null;
+    els.pageTitle.textContent = t("page.none");
+  }
+  // Keep the page bar visible whenever the Page toggle is ON — even when the active
+  // tab isn't readable — so the page chip AND the 📑 multi-tab picker stay reachable
+  // (that's the "page/tab selection popup disappeared" fix).
+  els.pageBar.classList.toggle("hidden", !els.pageCtx.checked);
 }
 
 // ----- Multi-tab context ----------------------------------------------------
@@ -719,7 +862,10 @@ function timeAgo(ts) {
   return t("time.day", { n: Math.floor(s / 86400) });
 }
 async function renderHistoryList() {
-  const list = await listConversations();
+  // Each workspace shows ONLY its own saved conversations (legacy entries with no
+  // mode are treated as Chat).
+  const all = await listConversations();
+  const list = all.filter((c) => (c.mode || "chat") === mode);
   els.historyList.innerHTML = "";
   if (!list.length) {
     const li = document.createElement("li");
@@ -755,27 +901,39 @@ async function renderHistoryList() {
     els.historyList.appendChild(li);
   }
 }
-async function saveCurrent() {
-  if (!settings.saveHistory || !transcript.length) return;
-  const sel = currentSelection();
+// Persist a SPECIFIC session (bound to its own convId/mode) so an answer that
+// finishes after the user has switched tabs is still saved to the right place.
+async function saveSession(sess, m, sel) {
+  if (!settings.saveHistory || !sess.transcript.length) return;
   await saveConversation({
-    id: convId, title: titleFrom(transcript), updatedAt: Date.now(),
-    providerId: sel.providerId, model: sel.modelId, transcript, nativeHistory: history,
+    id: sess.convId, title: titleFrom(sess.transcript), updatedAt: Date.now(), mode: m,
+    providerId: sel.providerId, model: sel.modelId, transcript: sess.transcript, nativeHistory: sess.history,
   });
+}
+async function saveCurrent() {
+  return saveSession(getSession(mode), mode, currentSelection());
 }
 function renderTranscriptItem(item) {
   if (item.role === "user") {
-    addMessage("user", item.text);
+    return addMessage("user", item.text);
   } else if (item.kind === "image") {
     const wrap = addMessage("assistant", "");
+    if (item.badge) {
+      const b = document.createElement("div");
+      b.className = "model-badge";
+      b.textContent = item.badge;
+      wrap.appendChild(b);
+    }
     for (const u of item.urls || []) {
       const img = document.createElement("img");
       img.src = u; img.className = "gen-image"; wrap.appendChild(img);
     }
+    return wrap;
   } else {
     const el = addMessage("assistant", "");
     el.innerHTML = renderMarkdown(item.text || "");
     enhanceArtifacts(el);
+    return el;
   }
 }
 async function loadConversation(id) {
@@ -785,6 +943,8 @@ async function loadConversation(id) {
   transcript = c.transcript || [];
   history = c.nativeHistory || [];
   convId = c.id;
+  lastUserContent = ""; // a loaded conversation has no pending "compare" target
+  syncSessionFromGlobals(mode); // these new arrays become this tab's live session
   for (const item of transcript) renderTranscriptItem(item);
   els.empty.classList.add("hidden");
   els.historyPanel.classList.add("hidden");
@@ -798,6 +958,7 @@ function startFreshChat() {
   transcript = [];
   convId = newConversationId();
   lastUserContent = "";
+  syncSessionFromGlobals(mode); // the fresh arrays are this tab's live session
   clearMessages();
   els.empty.classList.remove("hidden");
   updateEmptyState();
@@ -828,7 +989,7 @@ function wire() {
   bindToggle(els.thinking, "thinking");
   bindToggle(els.webSearch, "webSearch");
   bindToggle(els.pageCtx, "includePageContext", () =>
-    els.pageBar.classList.toggle("hidden", !(els.pageCtx.checked && currentPage))
+    els.pageBar.classList.toggle("hidden", !els.pageCtx.checked)
   );
   bindToggle(els.useTabs, "includeSelectedTabs");
 
@@ -854,7 +1015,9 @@ function wire() {
     els.historyPanel.classList.toggle("hidden");
   });
   els.clearHistory.addEventListener("click", async () => {
-    await clearConversations();
+    // Per-tab: clear only THIS workspace's saved conversations (the panel is filtered).
+    const all = await listConversations();
+    for (const c of all.filter((c) => (c.mode || "chat") === mode)) await deleteConversation(c.id);
     startFreshChat(); // the open one is gone too — start clean
     renderHistoryList();
   });
@@ -915,7 +1078,7 @@ function wire() {
     // rebuilt in the new language (simplest and fully consistent).
     if (changes.uiLang) { location.reload(); return; }
     const connChanged = !!(changes.keys || changes.baseUrls || changes.localEnabled);
-    if (!connChanged && !changes.modelLists && !changes.orModels && !changes.codeAppUrl) return;
+    if (!connChanged && !changes.modelLists && !changes.orModels && !changes.codeAppUrl && !changes.orFreeOnly) return;
     settings = await getSettings();
     updateImageNote();
     refreshModelUI();
@@ -958,7 +1121,7 @@ function addThinkBlock() {
 
 // Streaming sink: owns one assistant card (+ optional model badge) and its
 // thinking block. Used for a normal turn and for each compare run.
-function makeSink(badgeLabel) {
+function makeSink(badgeLabel, showThink = true) {
   let el = null, contentEl = null, raw = "", think = null;
   const ensure = () => {
     if (el) return;
@@ -980,6 +1143,11 @@ function makeSink(badgeLabel) {
       els.messages.scrollTop = els.messages.scrollHeight;
     },
     onThink(delta) {
+      // Only surface reasoning when the 💭 toggle is ON. Some models (DeepSeek R1,
+      // o-series, OpenRouter reasoning models) stream reasoning regardless of the
+      // request, so we gate the DISPLAY here — that's the "reasoning shows even when
+      // unchecked" fix.
+      if (!showThink) return;
       if (!think) think = addThinkBlock();
       think.textContent += delta;
       els.messages.scrollTop = els.messages.scrollHeight;
@@ -992,6 +1160,54 @@ function makeSink(badgeLabel) {
   };
 }
 
+// OpenRouter free-tier failures (data-policy gate / model unavailable / rate limit)
+// deserve an actionable message instead of a raw HTTP error.
+function isOpenRouterFreeError(providerId, msg) {
+  if (providerId !== "openrouter") return false;
+  return /no endpoints|data policy|privacy|404|not found|rate.?limit|429/i.test(msg || "");
+}
+function showRunError(providerId, e, modelId) {
+  if (e && e.name === "AbortError") { addMessage("tool", t("msg.interrupted")); return; }
+  const msg = e && e.message ? e.message : String(e);
+  if (isOpenRouterFreeError(providerId, msg)) {
+    if (modelId) handleOpenRouterUnavailable(modelId);
+    addOpenRouterFreeError();
+  } else {
+    addMessage("error", t("err.generic", { msg }));
+  }
+}
+// The OpenRouter free-tier error, with a one-click link straight to the privacy
+// page where free model endpoints are enabled.
+function addOpenRouterFreeError() {
+  const div = addMessage("error", t("err.orFree"));
+  div.appendChild(document.createElement("br"));
+  const a = document.createElement("a");
+  a.href = "https://openrouter.ai/settings/privacy";
+  a.textContent = t("or.enableLink");
+  a.style.color = "#b9a7ff";
+  a.style.fontWeight = "700";
+  a.addEventListener("click", (e) => {
+    e.preventDefault();
+    try { browser.tabs.create({ url: a.href }); } catch (_) { window.open(a.href, "_blank", "noopener"); }
+  });
+  div.appendChild(a);
+}
+// Drop an OpenRouter model that the account can't use from the picker, and switch
+// the active selection to the next best free model so the user isn't stuck on it.
+function handleOpenRouterUnavailable(modelId) {
+  if (!modelId || orUnavailable.has(modelId)) return;
+  orUnavailable.add(modelId);
+  const list = (settings.orModels || []).filter((m) => !orUnavailable.has(m.id));
+  if ((settings.models && settings.models.openrouter) === modelId) {
+    const pick = bestFreeOpenRouter(settings.orModels || []);
+    if (pick && pick !== modelId) {
+      settings.models = { ...(settings.models || {}), openrouter: pick };
+      setSettings({ models: settings.models });
+      addMessage("tool", t("or.switched", { model: pick }));
+    }
+  }
+  refreshModelUI();
+}
 function currentKeyMissing(providerId) {
   const meta = PROVIDERS[providerId];
   if (!meta || !meta.needsKey) return false;
@@ -1082,14 +1298,13 @@ async function compareLast(second, btn) {
       { thinking: els.thinking.checked, webSearch: els.webSearch.checked || lastForceWeb }
     );
     const system = buildSystemPrompt({ agentMode: false, targetLang: settings.targetLang, responseLang: settings.responseLang, mode: lastRunMode, blockPayments: settings.blockPayments });
-    const sink = makeSink(badge);
+    const sink = makeSink(badge, els.thinking.checked);
     await runConversation({ provider, system, history: [{ role: "user", content: lastUserContent }], tools: [], onText: sink.onText, onThink: sink.onThink, signal: abortController.signal });
     sink.finalize();
     if (sink.getRaw()) transcript.push({ role: "assistant", text: `**${badge}**\n\n${sink.getRaw()}` });
     attachCompareBar(sink.getEl()); // allow comparing again with yet another model
   } catch (e) {
-    if (e && e.name === "AbortError") addMessage("tool", t("msg.interrupted"));
-    else addMessage("error", t("err.generic", { msg: e && e.message ? e.message : String(e) }));
+    showRunError(second.providerId, e, second.modelId);
   } finally {
     endBusy();
     btn.disabled = false;
@@ -1112,8 +1327,14 @@ async function sendToModel(displayText, modelContent, { forceWeb = false, runMod
     settings.models = { ...(settings.models || {}), [sel.providerId]: sel.modelId };
     setSettings({ provider: sel.providerId, models: settings.models });
   }
+  // Bind this send to the conversation that is active RIGHT NOW. If the user
+  // switches workspace/discussion while the answer is still streaming, the globals
+  // get re-pointed — but we keep pushing into THIS session, so the AI's answer is
+  // never lost or misrouted (that's the "Chat loses responses on switch" fix).
+  const sess = getSession(mode);
+  const sessMode = mode;
   addMessage("user", displayText);
-  transcript.push({ role: "user", text: displayText });
+  sess.transcript.push({ role: "user", text: displayText });
   lastUserContent = modelContent;
   lastRunMode = runMode;
   lastForceWeb = forceWeb;
@@ -1159,8 +1380,8 @@ async function sendToModel(displayText, modelContent, { forceWeb = false, runMod
   if (isolated) {
     turnHistory = [{ role: "user", content: modelContent }];
   } else {
-    history.push({ role: "user", content: modelContent });
-    turnHistory = history;
+    sess.history.push({ role: "user", content: modelContent });
+    turnHistory = sess.history;
   }
   const provider = makeProvider(
     { ...settings, provider: turnSel.providerId, models: { ...settings.models, [turnSel.providerId]: turnSel.modelId } },
@@ -1168,7 +1389,7 @@ async function sendToModel(displayText, modelContent, { forceWeb = false, runMod
   );
   const system = buildSystemPrompt({ agentMode, targetLang: settings.targetLang, responseLang: settings.responseLang, mode: runMode, blockPayments: settings.blockPayments });
   const tools = activeTools({ agentMode });
-  const sink = makeSink(badge);
+  const sink = makeSink(badge, els.thinking.checked);
   try {
     await runConversation({
       provider, system, history: turnHistory, tools,
@@ -1184,15 +1405,14 @@ async function sendToModel(displayText, modelContent, { forceWeb = false, runMod
     });
     sink.finalize();
     if (sink.getRaw()) {
-      transcript.push({ role: "assistant", text: sink.getRaw() });
-      attachCompareBar(sink.getEl());
+      sess.transcript.push({ role: "assistant", text: sink.getRaw() });
+      if (mode === sessMode) attachCompareBar(sink.getEl()); // compare bar only if still on this tab
     }
   } catch (e) {
-    if (e && e.name === "AbortError") addMessage("tool", t("msg.interrupted"));
-    else addMessage("error", t("err.generic", { msg: e && e.message ? e.message : String(e) }));
+    showRunError(turnSel.providerId, e, turnSel.modelId);
   } finally {
     endBusy();
-    await saveCurrent();
+    await saveSession(sess, sessMode, sel);
   }
 }
 
@@ -1229,11 +1449,16 @@ async function onChatSend() {
 async function runTranslateFromInput() {
   const lang = els.translateLang.value || "French";
   let txt = els.input.value.trim();
-  let label = t("label.translate");
-  if (!txt) { txt = currentPage ? (currentPage.text || "").slice(0, settings.maxPageChars) : ""; label = t("label.translatePage"); }
+  // Show the actual user input as the message; only fall back to a short label when
+  // translating the current page (where the "input" is the whole page text).
+  let displayText = txt;
+  if (!txt) {
+    txt = currentPage ? (currentPage.text || "").slice(0, settings.maxPageChars) : "";
+    displayText = t("label.translatePage");
+  }
   if (!txt) return addMessage("error", t("err.nothingToTranslateInput"));
   els.input.value = "";
-  await sendToModel(label, t("prompt.translate", { lang, text: txt }), { runMode: "translate" });
+  await sendToModel(displayText, t("prompt.translate", { lang, text: txt }), { runMode: "translate" });
 }
 async function runImproveFromInput() {
   const presetId = els.improvePreset.value || "improve";
@@ -1241,9 +1466,9 @@ async function runImproveFromInput() {
   if (!txt) txt = await getSelection();
   if (!txt) return addMessage("error", t("err.typeOrSelect"));
   els.input.value = "";
-  const label = "✨ " + t("preset." + presetId);
   const instruction = t("presetPrompt." + presetId);
-  await sendToModel(label, `${instruction}\n${t("improve.only")}\n\n${t("improve.textLabel")}\n${txt}`, { runMode: "improve" });
+  // Show the user's own text as the message (not the preset label).
+  await sendToModel(txt, `${instruction}\n${t("improve.only")}\n\n${t("improve.textLabel")}\n${txt}`, { runMode: "improve" });
 }
 async function runImageFromInput() {
   const prompt = els.input.value.trim();
@@ -1303,6 +1528,7 @@ async function runImage(prompt) {
   }
   addMessage("user", "🎨 " + prompt);
   transcript.push({ role: "user", text: "🎨 " + prompt });
+  lastUserContent = prompt; // remember the prompt so we can regenerate on another model
   const status = addMessage("tool", t("image.generating"));
   startBusy();
   try {
@@ -1315,11 +1541,86 @@ async function runImage(prompt) {
       wrap.appendChild(img);
     }
     transcript.push({ role: "assistant", kind: "image", urls });
+    attachImageCompareBar(wrap); // ⚖ compare the result with another image model
   } catch (e) {
     status.remove();
     addMessage("error", t("err.image", { msg: e && e.message ? e.message : String(e) }));
   } finally {
     endBusy();
+    await saveCurrent();
+  }
+}
+
+// Image comparison: like the chat "compare" bar, but it regenerates the SAME
+// prompt with another connected IMAGE model (cost colour-coded in the picker).
+function attachImageCompareBar(el) {
+  els.messages.querySelectorAll(".msg-actions").forEach((n) => n.remove());
+  if (!el || !lastUserContent) return;
+  const list = imageModelChoices();
+  if (list.length < 2) return; // nothing to compare against
+  const bar = document.createElement("div");
+  bar.className = "msg-actions";
+  const lbl = document.createElement("span");
+  lbl.className = "cmp-lbl";
+  lbl.textContent = t("compare.with");
+  const sel = document.createElement("select");
+  sel.className = "cmp-select";
+  for (const [pid, mid, mlabel] of list) {
+    const o = document.createElement("option");
+    const tier = imagePriceTier(pid, mid);
+    o.value = pid + "|" + mid;
+    o.textContent = tier.emoji + " " + PROVIDERS[pid].label + " · " + mlabel;
+    o.style.color = tier.color;
+    sel.appendChild(o);
+  }
+  const cur = (settings.imageProvider || "openai") + "|" + (settings.imageModel || "");
+  for (const opt of sel.options) {
+    if (opt.value && opt.value !== cur) { sel.value = opt.value; break; }
+  }
+  const btn = document.createElement("button");
+  btn.className = "cmp-btn";
+  btn.textContent = t("compare.btn");
+  btn.addEventListener("click", () => compareImage(parseSel(sel.value), btn));
+  bar.appendChild(lbl);
+  bar.appendChild(sel);
+  bar.appendChild(btn);
+  el.appendChild(bar);
+}
+
+async function compareImage(second, btn) {
+  if (busy || !lastUserContent) return;
+  if (currentKeyMissing(second.providerId)) {
+    addMessage("error", t("err.keyMissingFor", { label: PROVIDERS[second.providerId].label }));
+    return;
+  }
+  btn.disabled = true;
+  startBusy();
+  const badge = `${PROVIDERS[second.providerId].label} · ${second.modelId}`;
+  const status = addMessage("tool", t("image.generating"));
+  try {
+    const urls = await generateImage(
+      { ...settings, imageProvider: second.providerId, imageModel: second.modelId },
+      { prompt: lastUserContent, size: els.imageSize.value || settings.imageSize, signal: abortController.signal }
+    );
+    status.remove();
+    const wrap = addMessage("assistant", "");
+    const b = document.createElement("div");
+    b.className = "model-badge";
+    b.textContent = badge;
+    wrap.appendChild(b);
+    for (const u of urls) {
+      const img = document.createElement("img");
+      img.src = u; img.alt = lastUserContent; img.className = "gen-image";
+      wrap.appendChild(img);
+    }
+    transcript.push({ role: "assistant", kind: "image", urls, badge });
+    attachImageCompareBar(wrap); // compare again with yet another model
+  } catch (e) {
+    status.remove();
+    addMessage("error", t("err.image", { msg: e && e.message ? e.message : String(e) }));
+  } finally {
+    endBusy();
+    btn.disabled = false;
     await saveCurrent();
   }
 }

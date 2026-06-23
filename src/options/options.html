@@ -1,165 +1,135 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="options.css" />
-    <title>AI Sidebar — Réglages</title>
+    <title data-i18n="opt.title">AI Sidebar — Settings</title>
   </head>
   <body>
     <main>
-      <h1>AI Sidebar — Réglages</h1>
-      <p class="muted">
-        100% <b>BYOK</b> : vos clés sont stockées <b>localement</b> dans ce
-        navigateur (<code>storage.local</code>), jamais synchronisées, et envoyées
-        uniquement à l'API que vous choisissez. Aucune clé n'est fournie par
-        l'extension — renseignez la vôtre, ou pointez un modèle local sans clé.
+      <h1 data-i18n="opt.title">AI Sidebar — Settings</h1>
+      <p class="muted" data-i18n-html="opt.intro">
+        100% <b>BYOK</b>: your keys are stored <b>locally</b> in this browser
+        (<code>storage.local</code>), never synced, and sent only to the API you choose.
       </p>
 
       <section class="quickconnect">
-        <h2 style="margin-top:0">⚡ Connexion rapide</h2>
-        <p class="muted">
-          Le plus simple : connecte ton compte <b>OpenRouter</b> (Google / GitHub / email)
-          en 1 clic — la clé API est créée et enregistrée automatiquement ci-dessous,
-          avec accès à des <b>modèles gratuits</b>.
+        <h2 style="margin-top:0" data-i18n="opt.quick.h">⚡ Quick connect</h2>
+        <p class="muted" data-i18n-html="opt.quick.p">
+          Simplest: connect your <b>OpenRouter</b> account in 1 click.
         </p>
-        <button id="quickConnect" class="grad">🔐 Se connecter à OpenRouter (gratuit, 1 clic)</button>
+        <button id="quickConnect" class="grad" data-i18n="opt.quick.btn">🔐 Connect to OpenRouter (free, 1-click)</button>
         <span id="quickStatus" class="muted"></span>
       </section>
 
-      <h2>Fournisseurs d'IA</h2>
-      <p class="muted">
-        Cliquez <b>« 🔐 Se connecter »</b> sur un fournisseur pour ouvrir sa page
-        d'<b>authentification</b>, identifiez-vous avec votre compte, créez une clé
-        API et collez-la. Beaucoup offrent un <b>palier gratuit</b> (Gemini, Groq,
-        Mistral, Cerebras, OpenRouter). <b>OpenRouter</b> propose en plus une vraie
-        <b>connexion par compte</b> (OAuth) qui débloque tous les modèles. Vous pouvez
-        aussi activer un <b>modèle local</b> (Ollama / LM Studio). Un fournisseur
-        n'apparaît dans le sélecteur qu'une fois <b>connecté</b>.
+      <h2 data-i18n="opt.providers.h">AI providers</h2>
+      <p class="muted" data-i18n-html="opt.providers.p">
+        Click « 🔐 Connect » on a provider to open its sign-in page.
       </p>
       <div id="providers"></div>
 
       <section>
-        <h2>🤖 Mode agent</h2>
-        <p class="muted">
-          En mode <b>Agent</b>, l'IA pilote le navigateur via des <b>outils</b>
-          (ouvrir un onglet, cliquer, remplir, lire la page…). Beaucoup de modèles
-          rapides/gratuits (ex. <b>Llama</b>) ne savent pas appeler d'outils et le
-          mode agent reste alors inactif. Choisissez ici un modèle <b>capable
-          d'appeler des outils</b> (Claude, GPT-4o, DeepSeek, Gemini…). Laissez
-          <b>Auto</b> pour utiliser le modèle sélectionné dans la sidebar.
+        <h2 data-i18n="opt.agent.h">🤖 Agent mode</h2>
+        <p class="muted" data-i18n-html="opt.agent.p">
+          In Agent mode the AI drives the browser through tools.
         </p>
-        <label>Modèle de l'agent
+        <label><span data-i18n="opt.agent.model">Agent model</span>
           <select id="agentModel"></select>
         </label>
-        <label>Autorisations de l'agent
+        <label><span data-i18n="opt.agent.perm">Agent permissions</span>
           <select id="agentPermission">
-            <option value="manual">Validation manuelle — demander avant chaque action</option>
-            <option value="auto">Tout autoriser — aucune demande d'autorisation</option>
+            <option value="manual" data-i18n="opt.agent.permManual">Manual approval — ask before each action</option>
+            <option value="auto" data-i18n="opt.agent.permAuto">Allow everything — no approval prompt</option>
           </select>
         </label>
-        <p class="muted">
-          En <b>validation manuelle</b> (recommandé), chaque action modifiant l'état
-          (clic, saisie, navigation…) demande votre accord. En <b>tout autoriser</b>,
-          l'agent enchaîne les actions sans confirmation. Dans les deux cas, le
-          <b>garde-fou anti-achat</b> reste actif : l'agent ne peut jamais payer.
+        <p class="muted" data-i18n-html="opt.agent.p2">
+          With manual approval (recommended), every state-changing action asks for consent.
         </p>
       </section>
 
       <section>
-        <h2>🌐 Recherche web</h2>
-        <p class="muted">
-          En mode <b>Web</b>, la requête est envoyée à un modèle capable de chercher
-          sur le web — de préférence <b>Perplexity</b> (Sonar) ou un modèle
-          <b>gratuit OpenRouter</b> (plugin web intégré), pour éviter de dépenser sur
-          Claude. Laissez <b>Auto</b> pour un choix automatique parmi vos fournisseurs
-          connectés.
+        <h2 data-i18n="opt.web.h">🌐 Web search</h2>
+        <p class="muted" data-i18n-html="opt.web.p">
+          In Web mode the request is sent to a web-capable model.
         </p>
-        <label>Modèle de recherche web
+        <label><span data-i18n="opt.web.model">Web search model</span>
           <select id="searchModel"></select>
         </label>
       </section>
 
       <section>
-        <h2>Génération d'images</h2>
-        <label>Fournisseur d'images
+        <h2 data-i18n="opt.img.h">Image generation</h2>
+        <label><span data-i18n="opt.img.provider">Image provider</span>
           <select id="imageProvider"></select>
         </label>
-        <label>Modèle d'image
+        <label><span data-i18n="opt.img.model">Image model</span>
           <input type="text" id="imageModel" placeholder="gpt-image-1" />
         </label>
-        <label>Taille par défaut
+        <label><span data-i18n="opt.img.size">Default size</span>
           <select id="imageSize"></select>
         </label>
-        <p class="muted">
-          Utilise l'endpoint compatible OpenAI <code>/images/generations</code>.
-          Les tailles dépendent du modèle (gpt-image-1 : 1024²/1536×1024/1024×1536 ·
-          DALL·E 3 : 1024²/1792×1024/1024×1792 · DALL·E 2 : 256²/512²/1024²). Le
-          <b>4K/1440p natif</b> n'est pas produit par ces modèles — générez en HD puis
-          agrandissez.
+        <p class="muted" data-i18n-html="opt.img.p">
+          Uses the OpenAI-compatible /images/generations endpoint.
         </p>
       </section>
 
       <section>
-        <h2>&lt;/&gt; Atelier de code</h2>
-        <p class="muted">
-          L'onglet <b>Code</b> de la sidebar ouvre <b>Program Generator</b>, un atelier
-          d'app IA auto-hébergé (basé sur <b>Bolt.diy</b>) dans un <b>nouvel onglet</b> :
-          génération de code, aperçu live, terminal intégré et <b>Expo Go</b>. Il forme
-          <b>un seul service</b> avec la sidebar : votre clé OpenRouter lui est transmise
-          automatiquement, sans la ressaisir. Renseignez l'URL de votre instance.
-          Laissez vide pour masquer le lanceur.
+        <h2 data-i18n-html="opt.code.h">&lt;/&gt; Code workshop</h2>
+        <p class="muted" data-i18n-html="opt.code.p">
+          The Code tab opens Program Generator in a new tab.
         </p>
-        <label>URL de l'atelier de code
+        <label><span data-i18n="opt.code.url">Code workshop URL</span>
           <input type="text" id="codeAppUrl" placeholder="https://code.hivey.be" />
         </label>
       </section>
 
       <section>
-        <h2>Langue &amp; rédaction</h2>
-        <label>Langue de l'interface (sidebar)
+        <h2 data-i18n="opt.lang.h">Language &amp; writing</h2>
+        <label><span data-i18n="opt.lang.ui">Interface language (sidebar)</span>
           <select id="uiLang">
-            <option value="en">English (default)</option>
-            <option value="fr">Français</option>
+            <option value="en" data-i18n="opt.uiEn">English (default)</option>
+            <option value="fr" data-i18n="opt.uiFr">French</option>
           </select>
         </label>
-        <label>Langue des réponses de l'IA
+        <label><span data-i18n="opt.lang.resp">AI response language</span>
           <select id="responseLang"></select>
         </label>
-        <label>Style d'écriture par défaut (mode Améliorer)
+        <label><span data-i18n="opt.lang.preset">Default writing style (Improve mode)</span>
           <select id="improvePreset"></select>
         </label>
-        <label>Langue cible des traductions
+        <label><span data-i18n="opt.lang.target">Translation target language</span>
           <input type="text" id="targetLang" placeholder="French" />
         </label>
       </section>
 
       <section>
-        <h2>Sécurité &amp; confidentialité</h2>
-        <p class="muted">
-          <b>Zéro rétention serveur</b> : cette extension n'a aucun serveur. Vos données
-          (clés, conversations, contenu des pages) restent dans ce navigateur et ne sont
-          envoyées qu'à l'API IA que vous choisissez. Aucune analytique, aucune télémétrie.
+        <h2 data-i18n="opt.sec.h">Security &amp; privacy</h2>
+        <p class="muted" data-i18n-html="opt.sec.p">
+          Zero server retention: this extension has no server.
         </p>
-        <label class="switch"><input type="checkbox" id="blockPayments" /><span class="track"></span><span class="lbl"><b>Garde-fou anti-achat</b> : l'agent ne peut jamais payer/commander</span></label>
-        <label class="switch"><input type="checkbox" id="webmailAssist" /><span class="track"></span><span class="lbl">Bouton « Répondre avec l'IA » sur les webmails (jamais d'envoi auto)</span></label>
-        <label class="switch"><input type="checkbox" id="saveHistory" /><span class="track"></span><span class="lbl">Enregistrer l'historique des conversations (local uniquement)</span></label>
-        <button id="clearHistoryBtn" class="ghost">Effacer tout l'historique</button>
+        <label class="switch"><input type="checkbox" id="blockPayments" /><span class="track"></span><span class="lbl" data-i18n-html="opt.sec.block"><b>Anti-purchase guardrail</b>: the agent can never pay/checkout</span></label>
+        <label class="switch"><input type="checkbox" id="webmailAssist" /><span class="track"></span><span class="lbl" data-i18n="opt.sec.webmail">« Reply with AI » button on webmails (never auto-sends)</span></label>
+        <label class="switch"><input type="checkbox" id="saveHistory" /><span class="track"></span><span class="lbl" data-i18n="opt.sec.save">Save conversation history (local only)</span></label>
+        <button id="clearHistoryBtn" class="ghost" data-i18n="opt.sec.clearBtn">Clear all history</button>
       </section>
 
       <section>
-        <h2>Comportement</h2>
-        <label class="switch"><input type="checkbox" id="thinking" /><span class="track"></span><span class="lbl">Afficher le raisonnement du modèle (thinking)</span></label>
-        <label class="switch"><input type="checkbox" id="webSearch" /><span class="track"></span><span class="lbl">Recherche web activée par défaut (Perplexity / OpenRouter / Claude)</span></label>
-        <label class="switch"><input type="checkbox" id="includePageContext" /><span class="track"></span><span class="lbl">L'IA voit la page consultée (injection auto en mode chat)</span></label>
-        <label class="switch"><input type="checkbox" id="autoReadPage" /><span class="track"></span><span class="lbl">Relire la page à chaque navigation (y compris sous-domaine)</span></label>
-        <label>Taille max du contexte de page (caractères)
+        <h2 data-i18n="opt.behavior.h">Behavior</h2>
+        <p class="muted" data-i18n-html="opt.behavior.reasoning">
+          The reasoning is controlled directly from the sidebar.
+        </p>
+        <label class="switch"><input type="checkbox" id="orFreeOnly" /><span class="track"></span><span class="lbl" data-i18n="opt.behavior.orFreeOnly">OpenRouter: show only free models (hide paid &amp; inaccessible)</span></label>
+        <label class="switch"><input type="checkbox" id="webSearch" /><span class="track"></span><span class="lbl" data-i18n="opt.behavior.web">Web search on by default (Perplexity / OpenRouter / Claude)</span></label>
+        <label class="switch"><input type="checkbox" id="includePageContext" /><span class="track"></span><span class="lbl" data-i18n="opt.behavior.page">The AI sees the current page (auto-injected in chat)</span></label>
+        <label class="switch"><input type="checkbox" id="autoReadPage" /><span class="track"></span><span class="lbl" data-i18n="opt.behavior.autoread">Re-read the page on each navigation (incl. subdomain)</span></label>
+        <label><span data-i18n="opt.behavior.maxchars">Max page context size (characters)</span>
           <input type="number" id="maxPageChars" min="1000" max="100000" step="1000" />
         </label>
       </section>
 
       <div class="actions">
-        <button id="save" class="grad">Enregistrer</button>
+        <button id="save" class="grad" data-i18n="opt.save">Save</button>
         <span id="status" class="muted"></span>
       </div>
     </main>
