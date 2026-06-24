@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Hivey AI — IA multi-fournisseurs",
-  "version": "1.23.0",
+  "version": "1.23.1",
   "description": "Sidebar IA open-source type Sider : branchez votre IA (Claude, OpenAI, Gemini, Mistral, Groq, DeepSeek, xAI, Perplexity, Together, Fireworks, OpenRouter, Ollama/LM Studio local…). Liste les modèles réellement dispo selon votre clé/compte. Lit page et onglets, résume, traduit, améliore (presets), compare un modèle à un autre, artifacts interactifs, images, capture de zone, thèmes, agent (avec garde-fous). Historique local, 100% BYOK.",
   "author": "Florian Martins",
   "content_security_policy": {
