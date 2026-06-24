@@ -4,12 +4,12 @@
    live when another theme is selected.
    ========================================================================== */
 :root {
-  --bg: #0f172a;
-  --panel: #1e293b;
-  --panel-2: #334155;
-  --elevated: #33415540;
-  --border: #2e3c53;
-  --border-soft: #233146;
+  --bg: #0b0f19;
+  --panel: #161f30;
+  --panel-2: #213049;
+  --elevated: #21304940;
+  --border: #2a3a54;
+  --border-soft: #1d2840;
   --text: #f8fafc;
   --muted: #94a3b8;
   --accent: #2563eb;
@@ -18,7 +18,7 @@
   --grad: linear-gradient(135deg, #2563eb 0%, #2563eb 40%, #7c3aed 100%);
   --grad-soft: linear-gradient(135deg, rgba(37, 99, 235, 0.16), rgba(124, 58, 237, 0.16));
   --user: linear-gradient(135deg, #2563eb, #7c3aed);
-  --tool: #1a2336;
+  --tool: #131c2e;
   --error: #3a1d24;
   --radius: 12px;
   --radius-sm: 9px;
