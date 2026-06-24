@@ -9,9 +9,9 @@
   <!-- Hivey mark: a beehive (skep) built from 4 thick, fully-rounded horizontal bars.
        Yellow→orange gradient, no background, legible down to favicon size. -->
   <g fill="url(#hive)">
-    <rect x="30" y="13" width="36" height="14" rx="7"/>
-    <rect x="21" y="32" width="54" height="14" rx="7"/>
-    <rect x="17" y="51" width="62" height="14" rx="7"/>
-    <rect x="24" y="70" width="48" height="14" rx="7"/>
+    <rect x="24" y="13" width="48" height="14" rx="7"/>
+    <rect x="17" y="32" width="62" height="14" rx="7"/>
+    <rect x="21" y="51" width="54" height="14" rx="7"/>
+    <rect x="30" y="70" width="36" height="14" rx="7"/>
   </g>
 </svg>

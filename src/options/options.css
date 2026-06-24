@@ -1,10 +1,10 @@
 :root {
-  --bg: #131519;
-  --panel: #1b1e24;
-  --panel-2: #23272e;
-  --border: #333843;
-  --text: #ececf1;
-  --muted: #9aa0ad;
+  --bg: #171717;
+  --panel: #1f1f1f;
+  --panel-2: #272727;
+  --border: #383838;
+  --text: #ececec;
+  --muted: #9b9b9b;
   --accent: #f59e0b;
   --grad: linear-gradient(135deg, #fbbf24 0%, #f59e0b 55%, #f97316 100%);
 }
@@ -68,7 +68,7 @@ button.ghost:hover { border-color: var(--accent); }
 .badge { font-size: 11px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border); white-space: nowrap; }
 .badge.ok { color: #7ee787; border-color: #2ea04366; background: #13351f; }
 .badge.off { color: var(--muted); }
-.badge.free { color: #fcd34d; border-color: #f59e0b66; background: #20242b; }
+.badge.free { color: #fcd34d; border-color: #f59e0b66; background: #262626; }
 button.small { padding: 7px 12px; font-size: 13px; }
 button.connect { width: 100%; margin: 6px 0 2px; }
 button.connect.connected { color: #7ee787; border: 1px solid #2ea04366; background: #13351f; }

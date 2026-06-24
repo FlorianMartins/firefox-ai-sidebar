@@ -4,21 +4,21 @@
    live when another theme is selected.
    ========================================================================== */
 :root {
-  --bg: #131519;
-  --panel: #1b1e24;
-  --panel-2: #23272e;
-  --elevated: #23272e40;
-  --border: #333843;
-  --border-soft: #23262d;
-  --text: #ececf1;
-  --muted: #9aa0ad;
+  --bg: #171717;
+  --panel: #1f1f1f;
+  --panel-2: #272727;
+  --elevated: #27272740;
+  --border: #383838;
+  --border-soft: #272727;
+  --text: #ececec;
+  --muted: #9b9b9b;
   --accent: #f59e0b;
   --accent-2: #fbbf24;
   --accent-3: #f97316;
   --grad: linear-gradient(135deg, #fbbf24 0%, #f59e0b 55%, #f97316 100%);
   --grad-soft: linear-gradient(135deg, rgba(251, 191, 36, 0.16), rgba(249, 115, 22, 0.16));
   --user: linear-gradient(135deg, #f59e0b, #f97316);
-  --tool: #1d2027;
+  --tool: #202020;
   --error: #3a1d24;
   --radius: 12px;
   --radius-sm: 9px;

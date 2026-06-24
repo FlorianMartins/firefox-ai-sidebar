@@ -5,7 +5,7 @@
 // theme AND override individual colours on top of it (stored in settings.themeColors).
 
 export const THEMES = {
-  hive:   { label: "Hivey (yellow/orange)", bg: "#131519", panel: "#1b1e24", panel2: "#23272e", border: "#333843", borderSoft: "#23262d", text: "#ececf1", muted: "#9aa0ad", accent: "#f59e0b", accent2: "#fbbf24", accent3: "#f97316" },
+  hive:   { label: "Hivey (yellow/orange)", bg: "#171717", panel: "#1f1f1f", panel2: "#272727", border: "#383838", borderSoft: "#272727", text: "#ececec", muted: "#9b9b9b", accent: "#f59e0b", accent2: "#fbbf24", accent3: "#f97316" },
   violet: { label: "Violet (blue/purple)",  bg: "#0f1117", panel: "#161922", panel2: "#1c2030", border: "#272c3b", borderSoft: "#1f2330", text: "#e7e8ef", muted: "#9aa0b4", accent: "#8b5cf6", accent2: "#6366f1", accent3: "#a855f7" },
   dark:   { label: "Default (dark)", bg: "#0f1117", panel: "#161922", panel2: "#1c2030", border: "#272c3b", borderSoft: "#1f2330", text: "#e7e8ef", muted: "#9aa0b4", accent: "#8b5cf6", accent2: "#6366f1", accent3: "#a855f7" },
   pro:    { label: "Pro (blue)",     bg: "#0d1117", panel: "#161b22", panel2: "#1c232c", border: "#2a313c", borderSoft: "#21272f", text: "#e6edf3", muted: "#8b949e", accent: "#2f81f7", accent2: "#1f6feb", accent3: "#58a6ff" },
