@@ -485,6 +485,22 @@ function buildQuickNav() {
   spy();
 }
 
+// Put the same monochrome line icon (from SECTION_ICONS) in front of each section
+// title, so the cards echo the quick-nav. Runs after applyDom so the icon isn't
+// wiped by the data-i18n text fill.
+function addSectionIcons() {
+  document.querySelectorAll("main > section[id]").forEach((sec) => {
+    const h = sec.querySelector("h2");
+    if (!h || h.querySelector(".h2-ic")) return;
+    const icon = SECTION_ICONS[sec.id];
+    if (!icon) return;
+    const ic = document.createElement("span");
+    ic.className = "h2-ic";
+    ic.innerHTML = icon; // trusted static SVG
+    h.insertBefore(ic, h.firstChild);
+  });
+}
+
 async function load() {
   settings = await getSettings();
   curTheme = settings.theme || "dark";
@@ -495,6 +511,7 @@ async function load() {
   document.documentElement.lang = settings.uiLang || "en";
   buildThemeControls();
   buildQuickNav();                         // jump pins to each section
+  addSectionIcons();                       // same line icons on each section title
   modelLists = { ...(settings.modelLists || {}) };
   buildProviderFields();
   buildImageProvider();

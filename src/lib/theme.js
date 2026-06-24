@@ -10,7 +10,7 @@
 // `split` is the % of the gradient held solid by accent before it transitions
 // (0 → a balanced accent↔accent2; 0.4 → ~70% accent / 30% accent2).
 export const THEMES = {
-  dark:   { label: "Default (dark)",   bg: "#0b0f19", panel: "#161f30", panel2: "#213049", border: "#2a3a54", borderSoft: "#1d2840", text: "#f8fafc", muted: "#94a3b8", accent: "#2563eb", accent2: "#7c3aed", split: 0.4 },
+  dark:   { label: "Default (dark)",   bg: "#0f111a", panel: "#1a1d2c", panel2: "#262a40", border: "#30334d", borderSoft: "#222538", text: "#f8fafc", muted: "#9b9db5", accent: "#8b5cf6", accent2: "#6366f1", split: 0.4 },
   hive:   { label: "Hivey (Brand)",    bg: "#0f1115", panel: "#1a1d24", panel2: "#242832", border: "#2c313c", borderSoft: "#20242d", text: "#f9fafb", muted: "#9ca3af", accent: "#d97706", accent2: "#f59e0b", split: 0.4 },
   modern: { label: "Modern (Teal)",    bg: "#090d16", panel: "#121b2c", panel2: "#1b2840", border: "#243349", borderSoft: "#182338", text: "#f4f4f5", muted: "#8b9bb0", accent: "#0d9488", accent2: "#14b8a6", split: 0.4 },
   neon:   { label: "Neon / Cyberpunk", bg: "#05050a", panel: "#0f0f1a", panel2: "#18182a", border: "#232342", borderSoft: "#1a1a30", text: "#ffffff", muted: "#9a9ac4", accent: "#06b6d4", accent2: "#d946ef", split: 0.0 },
