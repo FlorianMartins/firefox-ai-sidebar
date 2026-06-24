@@ -12,12 +12,12 @@
   --border-soft: #23233c;
   --text: #e8e8f2;
   --muted: #9c9cba;
-  --accent: #716bf6;
+  --accent: #4d7ef7;
   --accent-2: #3b82f6;
-  --accent-3: #a855f7;
-  --grad: linear-gradient(135deg, #3b82f6 0%, #716bf6 50%, #a855f7 100%);
-  --grad-soft: linear-gradient(135deg, rgba(59, 130, 246, 0.16), rgba(168, 85, 247, 0.16));
-  --user: linear-gradient(135deg, #3b82f6, #716bf6);
+  --accent-3: #8b5cf6;
+  --grad: linear-gradient(135deg, #3b82f6 0%, #4d7ef7 50%, #8b5cf6 100%);
+  --grad-soft: linear-gradient(135deg, rgba(59, 130, 246, 0.16), rgba(139, 92, 246, 0.16));
+  --user: linear-gradient(135deg, #3b82f6, #4d7ef7);
   --tool: #1b1b30;
   --error: #3a1d24;
   --radius: 12px;

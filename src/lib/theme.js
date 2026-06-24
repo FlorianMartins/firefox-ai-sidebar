@@ -6,7 +6,7 @@
 
 export const THEMES = {
   hive:   { label: "Hivey (yellow/orange)", bg: "#1c1d20", panel: "#242529", panel2: "#2c2d31", border: "#3a3c41", borderSoft: "#2a2b2f", text: "#e9e9ec", muted: "#9b9da4", accent: "#f59e0b", accent2: "#fbbf24", accent3: "#f97316" },
-  dark:   { label: "Default (dark)", bg: "#0f1117", panel: "#1f1f34", panel2: "#2a2a45", border: "#383859", borderSoft: "#23233c", text: "#e8e8f2", muted: "#9c9cba", accent: "#716bf6", accent2: "#3b82f6", accent3: "#a855f7" },
+  dark:   { label: "Default (dark)", bg: "#0f1117", panel: "#1f1f34", panel2: "#2a2a45", border: "#383859", borderSoft: "#23233c", text: "#e8e8f2", muted: "#9c9cba", accent: "#4d7ef7", accent2: "#3b82f6", accent3: "#8b5cf6" },
   pro:    { label: "Pro (blue)",     bg: "#0d1117", panel: "#161b22", panel2: "#1c232c", border: "#2a313c", borderSoft: "#21272f", text: "#e6edf3", muted: "#8b949e", accent: "#2f81f7", accent2: "#1f6feb", accent3: "#58a6ff" },
   gamer:  { label: "Gamer (neon)",   bg: "#08080f", panel: "#11111d", panel2: "#191929", border: "#2b2b48", borderSoft: "#20203a", text: "#e9e9ff", muted: "#9a9ac4", accent: "#00e5ff", accent2: "#7c4dff", accent3: "#ff2bd6" },
   modern: { label: "Modern (teal)",  bg: "#0f1417", panel: "#161c21", panel2: "#1e262c", border: "#2a333b", borderSoft: "#222a31", text: "#e8eef2", muted: "#90a0ad", accent: "#10b981", accent2: "#06b6d4", accent3: "#34d399" },

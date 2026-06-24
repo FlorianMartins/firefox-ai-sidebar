@@ -5,8 +5,8 @@
   --border: #383859;
   --text: #e8e8f2;
   --muted: #9c9cba;
-  --accent: #716bf6;
-  --grad: linear-gradient(135deg, #3b82f6 0%, #716bf6 50%, #a855f7 100%);
+  --accent: #4d7ef7;
+  --grad: linear-gradient(135deg, #3b82f6 0%, #4d7ef7 50%, #8b5cf6 100%);
 }
 * { box-sizing: border-box; }
 body {

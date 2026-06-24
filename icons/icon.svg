@@ -2,8 +2,8 @@
   <defs>
     <linearGradient id="hive" x1="8" y1="8" x2="88" y2="88" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#3b82f6"/>
-      <stop offset="0.5" stop-color="#716bf6"/>
-      <stop offset="1" stop-color="#a855f7"/>
+      <stop offset="0.5" stop-color="#4d7ef7"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
     </linearGradient>
   </defs>
   <!-- Hivey mark: a beehive (skep) built from 4 thick, fully-rounded horizontal bars,

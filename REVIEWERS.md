@@ -13,7 +13,7 @@ shipped **unmodified** from their official releases (verifiable by SHA-256, see 
 
 - Source repository: https://github.com/FlorianMartins/ai-sidebar-open-router
 - The submitted package corresponds to the git tag matching its `version`
-  (e.g. version `1.25.1` → tag `v1.25.1`).
+  (e.g. version `1.25.2` → tag `v1.25.2`).
 
 ---
 
@@ -60,7 +60,7 @@ optional lint/sign steps.)
 # 1. Get the exact source for this version
 git clone https://github.com/FlorianMartins/ai-sidebar-open-router.git
 cd ai-sidebar-open-router
-git checkout v1.25.1            # use the tag matching the submitted version
+git checkout v1.25.2            # use the tag matching the submitted version
 
 # 2. (Optional) verify the third-party libs are the unmodified upstream releases
 bash scripts/fetch-vendor.sh --check
@@ -71,8 +71,8 @@ bash scripts/build.sh
 
 This produces, in the repository root:
 
-- `ai-sidebar-1.25.1-firefox.zip`  (Firefox — built from `manifest.json`)
-- `ai-sidebar-chrome-1.25.1.zip`   (Chromium — built from `manifest.chrome.json`)
+- `ai-sidebar-1.25.2-firefox.zip`  (Firefox — built from `manifest.json`)
+- `ai-sidebar-chrome-1.25.2.zip`   (Chromium — built from `manifest.chrome.json`)
 
 The contents of `ai-sidebar-<version>-firefox.zip` are byte-for-byte the files under
 `src/`, `icons/`, `vendor/`, plus `manifest.json`, `LICENSE` and `README.md` — i.e.
