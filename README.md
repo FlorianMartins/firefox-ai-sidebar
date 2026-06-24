@@ -5,9 +5,13 @@ Une extension Firefox **open-source** qui ajoute une **sidebar IA** à la maniè
 qui **interagit réellement avec la page et les onglets** — ce que la sidebar native
 de Firefox ne permet pas. Un équivalent libre n'existait pas.
 
-- 🎨 **Interface moderne** : thème sombre + dégradé bleu/violet, **boutons à
-  bascule**, et un **sélecteur de modèle unifié** au-dessus du chat (une seule liste
-  groupée par fournisseur connecté).
+- 🎨 **Interface moderne & personnalisable** : plusieurs **thèmes** (Default, Pro,
+  Gamer, Modern, Sunset, Light) avec **personnalisation des couleurs par-dessus**
+  (accent, fond, surface, texte) et une **pipette** pour capturer une couleur à
+  l'écran. Zone de saisie unifiée façon Claude/Gemini, et un **sélecteur de modèle
+  unifié** au-dessus du chat (une seule liste groupée par fournisseur connecté).
+- 🌍 **Interface multilingue** : anglais, français, espagnol, allemand, italien,
+  portugais (réglable dans les paramètres).
 - 🔌 **Tous les fournisseurs** : **Claude**, **OpenAI**, **Gemini**, **Mistral**,
   **Groq**, **DeepSeek**, **xAI (Grok)**, **Perplexity**, **Together**, **Fireworks**,
   **DeepInfra**, **Cerebras**, **Cohere**, **OpenRouter**, et les **modèles locaux**
@@ -30,10 +34,9 @@ de Firefox ne permet pas. Un équivalent libre n'existait pas.
 - 🗂 **7 espaces de travail** via une **barre latérale d'activité** à gauche
   (convention « activity bar » façon VS Code / Slack — scale mieux qu'une rangée
   d'onglets) : **💬 Chat**, **🤖 Agent**, **🌐 Traduire**, **✨ Améliorer**,
-  **🎨 Image**, **⌨️ Terminal**, **&lt;/&gt; Code**. Le mode Améliorer propose des
+  **🎨 Image**, **📄 PDF**, **&lt;/&gt; Code**. Le mode Améliorer propose des
   **styles d'écriture** (Marketing, Newsletter, Email pro, LinkedIn, Tweet, Blog…) ;
-  le mode **Terminal** est un assistant dev (look terminal, code & commandes,
-  artifacts exécutables) — il **n'exécute pas** de commandes sur votre machine ; le
+  le mode **PDF** lit un document et répond à vos questions dessus ; le
   mode **Code** ouvre un atelier d'app IA complet (voir ci-dessous).
 - 👁 **L'IA voit la page** : le contenu est lu automatiquement à l'ouverture d'un
   site **et à chaque navigation** (y compris changement de sous-domaine et
@@ -42,14 +45,17 @@ de Firefox ne permet pas. Un équivalent libre n'existait pas.
   comme contexte à l'IA (comparer, synthétiser, recouper).
 - ⚡ **Actions rapides** + **clic droit** : Résumer / Traduire la **page** ou la
   **sélection**, Expliquer, Améliorer, **Rédiger une réponse**.
-- ✉️ **Réponse mail assistée** : sur les webmails (Gmail, Outlook, Proton, Yahoo),
-  un bouton **« Répondre avec l'IA »** rédige un brouillon — **jamais d'envoi auto**.
+- 🔍 **Recherche dans la conversation**, **glisser-déposer** de fichiers, et un
+  **outil de capture de zone** (📸) qui ajoute une capture d'écran de la page au contexte.
 - 💭 **Thinking** : le raisonnement du modèle (extended thinking de Claude,
   `reasoning` de DeepSeek / o-series) s'affiche dans un bloc repliable.
 - 🎨 **Génération d'images** (endpoint compatible OpenAI `/images/generations`).
 - 🤖 **Espace Agent** (onglet dédié) : l'IA peut lire la page/les onglets, naviguer,
-  cliquer, remplir des champs. **Autorisations réglables** : *validation manuelle*
-  (confirmation avant chaque action, par défaut) ou *tout autoriser* (sans demande).
+  cliquer, remplir des champs. **Autorisations réglables** : *Autoriser* (par défaut —
+  exécution automatique, mais les **actions sensibles** comme télécharger, réserver,
+  supprimer, s'inscrire demandent quand même confirmation) ou *validation manuelle*
+  (confirmation avant chaque action). Un **liseré lumineux** s'affiche sur la page
+  pendant que l'agent travaille.
   Dans les deux cas, le **garde-fou anti-achat** s'applique : elle peut remplir un
   panier mais **ne peut jamais payer/commander**. Un **modèle d'agent** dédié est
   réglable (beaucoup de modèles rapides/gratuits ne savent pas appeler d'outils).
@@ -68,7 +74,7 @@ de Firefox ne permet pas. Un équivalent libre n'existait pas.
 ## Capture
 
 Sidebar — thème sombre + dégradé bleu/violet, **barre latérale d'activité** à
-gauche (7 espaces : Chat / Agent / Traduire / Améliorer / Image / Terminal / Code),
+gauche (7 espaces : Chat / Agent / Traduire / Améliorer / Image / PDF / Code),
 sélecteur de modèle juste au-dessus du chat, boutons à bascule, **bouton
 « Comparer » sous la dernière réponse**, et un **artifact interactif jouable** (un
 mini-jeu qui tourne dans l'aperçu sandboxé) — Firefox 152 :
@@ -180,8 +186,10 @@ src/
 - **Anti prompt-injection** : le contenu des pages, onglets et sélections est traité
   comme une **donnée non fiable**. Le prompt système interdit d'obéir à des
   instructions trouvées dans une page et de divulguer les clés/réglages.
-- **Autorisations de l'agent réglables** : en *validation manuelle* (par défaut)
-  chaque action modifiant l'état est confirmée ; en *tout autoriser* l'agent enchaîne
+- **Autorisations de l'agent réglables** : en *Autoriser* (par défaut) l'agent
+  s'exécute seul mais **confirme les actions très sensibles** (téléchargement,
+  réservation, suppression, virement, inscription, installation…) ; en *validation
+  manuelle* chaque action modifiant l'état est confirmée ; en *tout autoriser* l'agent enchaîne
   sans demande — mais le **garde-fou anti-achat reste actif dans les deux cas**
   (refus codé en dur, indépendant du prompt). Le défaut sûr est la validation manuelle.
 - **Espace Code isolé** : l'atelier d'app IA s'ouvre dans un **onglet distinct**
@@ -219,9 +227,8 @@ bouton **Ouvrir** (plein écran) :
 - [x] Multi-fournisseurs + modèles locaux (Ollama / LM Studio / custom)
 - [x] Lecture auto de la page à chaque navigation (sous-domaine, SPA)
 - [x] Lecture multi-onglets (sélection des onglets à donner en contexte)
-- [x] Espaces dédiés via barre d'activité : Chat / Agent / Traduire / Améliorer / Image / Terminal / Code
+- [x] Espaces dédiés via barre d'activité : Chat / Agent / Traduire / Améliorer / Image / PDF / Code
 - [x] Actions rapides + clic droit (page & sélection) + rédaction de réponse
-- [x] Réponse mail assistée sur les webmails (sans envoi auto)
 - [x] Espace agent avec autorisations réglables (manuel / auto) + garde-fou anti-achat
 - [x] Espace Code : atelier d'app IA (Bolt.diy / Behivey) en nouvel onglet (preview, Expo Go)
 - [x] Thinking / raisonnement

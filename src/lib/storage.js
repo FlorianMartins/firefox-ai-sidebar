@@ -29,9 +29,11 @@ const DEFAULTS = {
   agentMode: false, // allow the model to act inside the browser
   agentModel: "", // "providerId|modelId" forced for agent mode ("" = use the selected model). Many free
                   // models (e.g. Llama) can't call tools — let the user pick a tool-capable model here.
-  agentPermission: "manual", // "manual" = confirm each state-changing action ; "auto" = allow all (no prompt).
-                             // The anti-purchase guardrail (blockPayments) still applies in BOTH modes.
-  confirmActions: true, // ask before every state-changing action (kept in sync with agentPermission)
+  agentPermission: "auto", // "auto" (default) = run actions automatically, BUT very sensitive ones
+                           // (download / reserve / book / delete / transfer / sign-up / install…)
+                           // still ask for confirmation; "manual" = confirm EVERY state-changing action.
+                           // The anti-purchase guardrail (blockPayments) applies in BOTH modes.
+  confirmActions: false, // ask before every state-changing action (kept in sync with agentPermission)
   includePageContext: true, // feed the active page into the chat
   autoReadPage: true, // re-read the page on every navigation (subdomains too)
   includeSelectedTabs: false, // also feed the user-selected extra tabs
@@ -46,6 +48,8 @@ const DEFAULTS = {
                      // Inaccessible models are auto-removed on error + a data-policy link is shown.
   improvePreset: "improve", // default writing preset for the "improve" mode
   uiLang: "en", // sidebar interface language: "en" (default) | "fr". Changed from Settings.
+  theme: "dark", // colour theme key (see src/lib/theme.js): dark | pro | gamer | modern | sunset | light
+  themeColors: {}, // optional per-colour overrides applied ON TOP of the theme { accent, accent2, bg, panel, text }
   railSide: "left", // workspace tab rail position INSIDE the sidebar: "left" (default) | "right".
                     // (The sidebar's own browser-side position is not controllable by extensions.)
   railHidden: false, // hide the workspace tabs rail entirely (toggled by clicking the brand/logo).
@@ -129,6 +133,22 @@ export async function getSettings() {
     s.responseLang = "Auto";
     s.respLangMigrated = true;
     try { await browser.storage.local.set({ responseLang: "Auto", respLangMigrated: true }); } catch (_) {}
+  }
+  // One-time: the agent now defaults to "auto" (Allow), with very sensitive actions
+  // still confirmed. Flip the old "manual" default to "auto" ONCE; an explicit later
+  // choice of "manual" sticks (it re-sets the flag only on this first pass).
+  if (s.agentPermission === "manual" && !s.agentPermMigrated) {
+    s.agentPermission = "auto";
+    s.confirmActions = false;
+    s.agentPermMigrated = true;
+    try { await browser.storage.local.set({ agentPermission: "auto", confirmActions: false, agentPermMigrated: true }); } catch (_) {}
+  }
+  // One-time: ensure "Page" (read the active tab) is ON by default. Flip a stored
+  // false to true ONCE; the user can still turn it off afterwards (flag prevents re-flip).
+  if (s.includePageContext === false && !s.pageCtxOnMigrated) {
+    s.includePageContext = true;
+    s.pageCtxOnMigrated = true;
+    try { await browser.storage.local.set({ includePageContext: true, pageCtxOnMigrated: true }); } catch (_) {}
   }
   // One-time: the earlier build defaulted to free-only, which hid paid models and made
   // every shown model the same green. Flip it off once so the full coloured list returns.

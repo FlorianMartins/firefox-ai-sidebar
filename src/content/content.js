@@ -56,6 +56,34 @@
     return CARD_FIELD.test(hay);
   }
 
+  // --- Very sensitive (non-payment) actions: ALWAYS confirmed, even in "Allow" mode.
+  // Downloading, reserving/booking, deleting, transferring, signing up, installing… The
+  // agent must get the user's OK before doing these. Payments stay hard-blocked above.
+  const SENSITIVE_WORDS = [
+    "download", "télécharger", "telecharger",
+    "reserve", "reservation", "réserver", "reserver", "réservation",
+    "book now", "book ticket", "booking",
+    "delete", "supprimer", "remove account", "delete account", "supprimer le compte",
+    "transfer", "transférer", "transferer", "virement", "wire ",
+    "sign up", "signup", "register", "create account", "s'inscrire", "inscrire", "créer un compte", "creer un compte",
+    "apply now", "postuler", "submit application",
+    "install", "installer",
+    "send email", "send message", "envoyer le message", "envoyer un message",
+    "unsubscribe", "se désabonner", "se desabonner",
+    "publish", "publier", "post publicly",
+  ];
+  function looksLikeSensitiveControl(el) {
+    // A real download link/button (download attribute or a file href).
+    if (el.tagName === "A" &&
+        ((el.hasAttribute && el.hasAttribute("download")) ||
+         /\.(zip|exe|dmg|msi|pkg|apk|iso|deb|rpm|7z|rar|tar|gz|jar|bin|app|csv|xlsx?)(\?|#|$)/i.test((el.getAttribute && el.getAttribute("href")) || ""))) {
+      return "download";
+    }
+    const hay = textOf(el);
+    for (const w of SENSITIVE_WORDS) if (hay.includes(w)) return w.trim();
+    return null;
+  }
+
   function isVisible(el) {
     if (!el || !el.getBoundingClientRect) return false;
     const r = el.getBoundingClientRect();
@@ -127,22 +155,32 @@
     return { count: out.length, elements: out };
   }
 
-  function clickElement(ref, guard) {
+  function clickElement(ref, guard, confirmed) {
     const el = refMap.get(ref);
     if (!el) return { error: `ref not found: ${ref} (re-run find_elements)` };
     if (guard && guard.blockPayments && looksLikePaymentControl(el)) {
       return { error: "Blocked by safety guardrail: payment/checkout action is not allowed.", blocked: true };
+    }
+    // Very sensitive action → ask the user to confirm (even in "Allow" mode).
+    if (!confirmed) {
+      const reason = looksLikeSensitiveControl(el);
+      if (reason) return { confirm: true, action: reason, label: labelOf(el) };
     }
     el.scrollIntoView({ block: "center" });
     el.click();
     return { ok: true, clicked: labelOf(el) };
   }
 
-  function fillInput(ref, value, submit, guard) {
+  function fillInput(ref, value, submit, guard, confirmed) {
     const el = refMap.get(ref);
     if (!el) return { error: `ref not found: ${ref} (re-run find_elements)` };
     if (guard && guard.blockPayments && looksLikeCardField(el)) {
       return { error: "Blocked by safety guardrail: card/payment field is not allowed.", blocked: true };
+    }
+    // If submitting a form that triggers a very sensitive action, confirm first.
+    if (submit && !confirmed) {
+      const reason = (el.form && looksLikeSensitiveControl(el.form)) || looksLikeSensitiveControl(el);
+      if (reason) return { confirm: true, action: reason, label: labelOf(el) };
     }
     el.focus();
     const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), "value");
@@ -319,8 +357,35 @@
     });
   }
 
+  // --- Agent activity glow -------------------------------------------------
+  // A soft pulsing border around the viewport (à la Perplexity) shown while the agent
+  // is acting on this page. pointer-events:none so it never blocks the page.
+  let glowEl = null;
+  function setAgentGlow(on) {
+    if (on) {
+      if (glowEl && document.documentElement.contains(glowEl)) return;
+      if (!document.getElementById("__ai_agent_glow_style")) {
+        const st = document.createElement("style");
+        st.id = "__ai_agent_glow_style";
+        st.textContent =
+          "@keyframes aiAgentGlow{0%,100%{box-shadow:inset 0 0 16px 3px rgba(139,92,246,.55),inset 0 0 4px 1px rgba(168,85,247,.85)}50%{box-shadow:inset 0 0 36px 9px rgba(99,102,241,.8),inset 0 0 9px 2px rgba(168,85,247,1)}}" +
+          "#__ai_agent_glow{position:fixed;inset:0;z-index:2147483646;pointer-events:none;border-radius:2px;animation:aiAgentGlow 1.8s ease-in-out infinite}";
+        (document.head || document.documentElement).appendChild(st);
+      }
+      glowEl = document.createElement("div");
+      glowEl.id = "__ai_agent_glow";
+      document.documentElement.appendChild(glowEl);
+    } else if (glowEl) {
+      glowEl.remove();
+      glowEl = null;
+    }
+  }
+
   browser.runtime.onMessage.addListener((msg) => {
     switch (msg && msg.type) {
+      case "agent_glow":
+        setAgentGlow(!!msg.on);
+        return Promise.resolve({ ok: true });
       case "read_page":
         return Promise.resolve(readPage());
       case "read_selection":
@@ -338,9 +403,9 @@
       case "find_elements":
         return Promise.resolve(findElements(msg.query));
       case "click_element":
-        return Promise.resolve(clickElement(msg.ref, msg.guard));
+        return Promise.resolve(clickElement(msg.ref, msg.guard, msg.confirmed));
       case "fill_input":
-        return Promise.resolve(fillInput(msg.ref, msg.value, msg.submit, msg.guard));
+        return Promise.resolve(fillInput(msg.ref, msg.value, msg.submit, msg.guard, msg.confirmed));
       case "scroll_page":
         return Promise.resolve(scrollPage(msg.direction));
       case "ping":

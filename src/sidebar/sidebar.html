@@ -9,16 +9,15 @@
   <body>
     <!-- Top bar: brand + global actions -->
     <header class="topbar">
-      <div class="brand" id="brandToggle" role="button" tabindex="0" data-i18n-title="brand.toggle" title="Show / hide the tabs menu">
-        <img src="../../icons/icon.svg" alt="" class="brand-logo" />
-        <span class="brand-name">AI Sidebar</span>
-      </div>
+      <button class="menu-btn" id="brandToggle" data-i18n-title="brand.toggle" title="Show / hide the menu">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
       <div class="row">
         <button id="searchBtn" class="icon icon-accent" data-i18n-title="search.title" title="Search in this conversation"><svg class="glyph-svg" viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="url(#histg)" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></button>
-        <button id="historyBtn" class="icon icon-accent" data-i18n-title="history.title" title="History (local)"><svg class="glyph-svg" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="url(#histg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><defs><linearGradient id="histg" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6366f1"/><stop offset="0.55" stop-color="#8b5cf6"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs><path d="M3 3.5v5h5"/><path d="M3.5 13a9 9 0 1 0 2.4-6.4L3 8.5"/><path d="M12 7.5v5l3.5 2"/></svg></button>
+        <button id="historyBtn" class="icon icon-accent" data-i18n-title="history.title" title="History (local)"><svg class="glyph-svg" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="url(#histg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><defs><linearGradient id="histg" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" style="stop-color:var(--accent-2)"/><stop offset="0.55" style="stop-color:var(--accent)"/><stop offset="1" style="stop-color:var(--accent-3)"/></linearGradient></defs><path d="M3 3.5v5h5"/><path d="M3.5 13a9 9 0 1 0 2.4-6.4L3 8.5"/><path d="M12 7.5v5l3.5 2"/></svg></button>
         <button id="newChat" class="icon icon-accent" data-i18n-title="newChat.title" title="New conversation"><svg class="glyph-svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="url(#histg)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
         <button id="expandTab" class="icon icon-accent" data-i18n-title="expand.title" title="Open in a full-screen tab"><svg class="glyph-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="url(#histg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M21 3l-8 8"/><path d="M9 21H3v-6"/><path d="M3 21l8-8"/></svg></button>
-        <button id="openOptions" class="icon icon-accent" data-i18n-title="settings.title" title="Settings"><svg class="glyph-svg" viewBox="0 0 16 16" width="18" height="18" fill="url(#gearg)" aria-hidden="true"><defs><linearGradient id="gearg" x1="0" y1="0" x2="16" y2="16" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6366f1"/><stop offset="0.55" stop-color="#8b5cf6"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs><path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.16.291a1.873 1.873 0 0 0 1.116 2.693l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.16a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.16-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.16a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/></svg></button>
+        <button id="openOptions" class="icon icon-accent" data-i18n-title="settings.title" title="Settings"><svg class="glyph-svg" viewBox="0 0 16 16" width="18" height="18" fill="url(#gearg)" aria-hidden="true"><defs><linearGradient id="gearg" x1="0" y1="0" x2="16" y2="16" gradientUnits="userSpaceOnUse"><stop offset="0" style="stop-color:var(--accent-2)"/><stop offset="0.55" style="stop-color:var(--accent)"/><stop offset="1" style="stop-color:var(--accent-3)"/></linearGradient></defs><path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.16.291a1.873 1.873 0 0 0 1.116 2.693l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.16a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.16-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.16a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/></svg></button>
       </div>
     </header>
 
@@ -143,20 +142,9 @@
       </div>
     </div>
 
-    <!-- Adaptive control row (toggles / per-mode controls) -->
+    <!-- Adaptive control row (per-mode controls: translate / improve / image / PDF).
+         The chat toggles (Thinking / Web / Page) now live inside the composer below. -->
     <div class="controls" id="controls">
-      <div class="ctl-group" id="chatControls">
-        <label class="chip" data-i18n-title="chip.thinkingTitle" title="Show the model's reasoning">
-          <input type="checkbox" id="thinking" /><span data-i18n="chip.thinking">💭 Reasoning</span>
-        </label>
-        <label class="chip" data-i18n-title="chip.webTitle" title="Web search (Perplexity / OpenRouter / Claude) — configurable in ⚙">
-          <input type="checkbox" id="webSearch" /><span>🌐 Web</span>
-        </label>
-        <label class="chip" data-i18n-title="chip.pageTitle" title="The AI sees the current page">
-          <input type="checkbox" id="pageCtx" /><span>🔍 Page</span>
-        </label>
-      </div>
-
       <div class="ctl-group hidden" id="translateControls">
         <label><span data-i18n="translate.to">Translate to</span>
           <select id="translateLang">
@@ -237,13 +225,28 @@
       <div id="dropOverlay" class="drop-overlay hidden"><span>📎 <span data-i18n="drop.hint">Drop files here to attach them</span></span></div>
       <!-- Attachment preview strip (files / images fed to the AI as context). -->
       <div id="attachStrip" class="attach-strip hidden"></div>
-      <div class="composer-row">
-        <button id="attachBtn" class="comp-icon" data-i18n-title="attach.title" title="Attach files or images"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" aria-hidden="true"><path d="M12 5.5v13M5.5 12h13"/></svg></button>
-        <input type="file" id="attachInput" multiple accept="image/*,.pdf,.txt,.md,.markdown,.csv,.json,.log,.html,.xml,.yaml,.yml,.js,.ts,.py,.java,.c,.cpp,.cs,.go,.rb,.rs,.php,.sh,.css" hidden />
-        <textarea id="input" rows="1" data-i18n-ph="composer.ph" placeholder="Write a message…"></textarea>
-        <button id="send" class="btn-grad send" data-i18n-title="send.title" title="Send">➤</button>
-        <button id="stop" class="hidden send" data-i18n-title="stop.title" title="Stop">■</button>
+      <!-- One rounded input box: the "+" sits to the LEFT of the text on the first row,
+           the chat toggles + stop on a bottom row at the right. No send button — Enter sends. -->
+      <div class="composer-box">
+        <div class="composer-main" id="composerMain">
+          <button id="attachBtn" class="attach-btn" data-i18n-title="attach.title" title="Attach files or images"><svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+          <textarea id="input" rows="1" data-i18n-ph="composer.ph" placeholder="Write a message…"></textarea>
+        </div>
+        <div class="composer-tools">
+          <!-- On the Chat tab, the "+" is moved here (bottom-left, beside the toggles).
+               On every other tab it stays next to the text in .composer-main above. -->
+          <div class="tools-left" id="toolsLeft"></div>
+          <div class="tools-right">
+            <div class="chat-toggles" id="chatControls">
+              <label class="ctoggle" data-i18n-title="chip.thinkingTitle" title="Thinking — show the model's reasoning"><input type="checkbox" id="thinking" /><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg></label>
+              <label class="ctoggle" data-i18n-title="chip.webTitle" title="Web search (Perplexity / OpenRouter / Claude)"><input type="checkbox" id="webSearch" /><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18"/></svg></label>
+              <label class="ctoggle" data-i18n-title="chip.pageTitle" title="Page — the AI sees the current page"><input type="checkbox" id="pageCtx" /><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6"/><path d="M9 17h6"/></svg></label>
+            </div>
+            <button id="stop" class="ctool stop hidden" data-i18n-title="stop.title" title="Stop">■</button>
+          </div>
+        </div>
       </div>
+      <input type="file" id="attachInput" multiple accept="image/*,.pdf,.txt,.md,.markdown,.csv,.json,.log,.html,.xml,.yaml,.yml,.js,.ts,.py,.java,.c,.cpp,.cs,.go,.rb,.rs,.php,.sh,.css" hidden />
     </footer>
 
       </div><!-- /#workArea -->

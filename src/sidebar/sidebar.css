@@ -12,6 +12,7 @@
   --muted: #9aa0b4;
   --accent: #8b5cf6;
   --accent-2: #6366f1;
+  --accent-3: #a855f7;
   --grad: linear-gradient(135deg, #6366f1 0%, #8b5cf6 55%, #a855f7 100%);
   --grad-soft: linear-gradient(135deg, rgba(99, 102, 241, 0.16), rgba(168, 85, 247, 0.16));
   --user: linear-gradient(135deg, #4f46e5, #7c3aed);
@@ -44,16 +45,18 @@ button { cursor: pointer; }
   padding: 8px 10px; border-bottom: 1px solid var(--border-soft);
   background: var(--panel);
 }
-.brand { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; border-radius: 8px; padding: 2px 4px; margin: -2px -4px; transition: background 0.15s; }
-.brand:hover { background: var(--panel-2); }
-/* Tabs rail hidden via the brand toggle. */
-body.rail-collapsed #rail { display: none; }
-.brand-logo { width: 22px; height: 22px; border-radius: 7px; }
-.brand-name {
-  font-weight: 700; font-size: 14px; letter-spacing: -0.2px;
-  background: var(--grad); -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent;
+/* Top-left menu toggle (hamburger) — shows/hides the workspace rail, like the menu
+   button on claude.ai / gemini. Accent when the menu is open, neutral when collapsed. */
+.menu-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; padding: 0; border: 1px solid transparent; border-radius: 9px;
+  background: transparent; color: var(--muted); transition: 0.15s; cursor: pointer;
 }
+.menu-btn svg { display: block; }
+.menu-btn:hover { background: var(--panel-2); color: var(--text); border-color: var(--border); }
+body:not(.rail-collapsed) .menu-btn { color: var(--accent); }
+/* Tabs rail hidden via the menu toggle. */
+body.rail-collapsed #rail { display: none; }
 /* Nudge the header icons right by half the width difference between the 34px accent
    buttons and the 24px page-bar icons, so the ⚙ gear lines up vertically with the 📑
    tabs-picker button below it. */
@@ -114,7 +117,7 @@ body.rail-collapsed #rail { display: none; }
 }
 .railtab:hover { color: var(--text); background: var(--panel-2); }
 .railtab.active {
-  color: var(--text); background: var(--grad-soft); border-color: rgba(139, 92, 246, 0.5);
+  color: var(--text); background: var(--grad-soft); border-color: color-mix(in srgb, var(--accent) 50%, transparent);
 }
 #workArea { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 
@@ -232,9 +235,9 @@ body.rail-right .rail { border-right: 0; border-left: 1px solid var(--border-sof
 .btn-grad {
   background: var(--grad); color: #fff; border: 0; border-radius: 10px;
   padding: 9px 14px; font-weight: 600; font-size: 13px;
-  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.3); transition: 0.15s;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 32%, transparent); transition: 0.15s;
 }
-.btn-grad:hover { filter: brightness(1.08); box-shadow: 0 6px 18px rgba(124, 58, 237, 0.42); }
+.btn-grad:hover { filter: brightness(1.08); box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 45%, transparent); }
 .btn-ghost {
   background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
   border-radius: 10px; padding: 9px 14px; font-weight: 600; font-size: 13px;
@@ -249,15 +252,18 @@ body.rail-right .rail { border-right: 0; border-left: 1px solid var(--border-sof
 .msg .model-badge {
   display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700;
   color: var(--text); margin: -2px 0 6px; padding: 2px 8px; border-radius: 999px;
-  background: var(--grad-soft); border: 1px solid rgba(139, 92, 246, 0.4);
+  background: var(--grad-soft); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 /* ----- Confirm bar ----- */
 .confirm {
-  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px;
   padding: 9px 11px; background: var(--panel-2); border-top: 1px solid var(--border); font-size: 12.5px;
 }
-.confirm-actions { display: flex; gap: 6px; }
+/* The message takes the full width and wraps; the Allow/Deny buttons drop to their own
+   line so they stay fully visible no matter how narrow the sidebar is. */
+#confirmText { flex: 1 1 100%; overflow-wrap: anywhere; }
+.confirm-actions { display: flex; gap: 6px; flex: 0 0 auto; }
 .confirm button { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); }
 .confirm .ok { background: var(--grad); border-color: transparent; color: #fff; font-weight: 600; }
 
@@ -285,7 +291,7 @@ body.rail-right .rail { border-right: 0; border-left: 1px solid var(--border-sof
 .ctl-group .chip input { position: absolute; opacity: 0; width: 0; height: 0; }
 .ctl-group .chip:hover { color: var(--text); border-color: var(--accent-2); }
 .ctl-group .chip:has(input:checked) {
-  color: var(--text); background: var(--grad-soft); border-color: rgba(139, 92, 246, 0.6);
+  color: var(--text); background: var(--grad-soft); border-color: color-mix(in srgb, var(--accent) 60%, transparent);
 }
 
 /* ----- PDF workspace controls ----- */
@@ -296,32 +302,67 @@ body.rail-right .rail { border-right: 0; border-left: 1px solid var(--border-sof
    blank full-width row (the gap between "Load PDF" and the model picker below). */
 #pdfInfo:empty { display: none; }
 
-/* ----- Composer ----- */
+/* ----- Composer (one rounded input box, à la Claude / ChatGPT / Gemini) ----- */
 .composer {
-  display: flex; flex-direction: column; gap: 8px; padding: 10px;
+  display: flex; flex-direction: column; gap: 8px; padding: 8px 10px 12px;
   border-top: 1px solid var(--border-soft); background: var(--panel);
 }
-.composer-row { display: flex; gap: 6px; align-items: flex-end; }
-.composer textarea {
-  flex: 1; resize: none; max-height: 150px; padding: 10px 12px;
-  background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; color: var(--text);
+.composer-box {
+  border: 1px solid var(--border); border-radius: 18px; background: var(--panel-2);
+  padding: 6px 8px 7px; transition: border-color 0.15s, box-shadow 0.15s;
 }
-.composer textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18); }
-.send { min-width: 40px; height: 40px; border-radius: 12px; font-size: 15px; border: 0; }
-#send { color: #fff; }
-#stop { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); }
+.composer-box:focus-within {
+  border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+/* First row: the "+" on the left (vertically centred) and the text right next to it. */
+.composer-main { display: flex; align-items: center; gap: 2px; }
+.composer textarea {
+  flex: 1 1 auto; min-width: 0; box-sizing: border-box; resize: none; min-height: 40px; max-height: 220px;
+  padding: 9px 6px 5px; background: transparent; border: 0; color: var(--text); display: block;
+}
+.composer textarea:focus { outline: none; }
+/* Second row: an optional left slot (the "+" on the Chat tab) and the chat toggles +
+   stop on the right. */
+.composer-tools { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 2px 2px 0; min-height: 0; }
+.tools-left { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+.tools-right { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
 
-/* Composer side button (attach) — square, crisp centered icon. */
-.comp-icon {
-  flex: 0 0 auto; width: 40px; height: 40px; padding: 0;
-  border: 1px solid var(--border); background: var(--panel-2); border-radius: 12px;
-  cursor: pointer; color: var(--accent); transition: 0.15s;
+/* Round icon buttons inside the box (attach +, stop). */
+.ctool {
+  flex: 0 0 auto; width: 32px; height: 32px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--panel); color: var(--text);
+  display: inline-flex; align-items: center; justify-content: center; transition: 0.15s;
+}
+.ctool svg { display: block; }
+.ctool:hover { border-color: var(--accent); color: var(--accent); }
+.ctool:active { transform: scale(0.94); }
+.ctool[hidden] { display: none !important; }
+.ctool.stop { font-size: 12px; }
+
+/* Attach (+) — no background, large and centered (Gemini-style). */
+.attach-btn {
+  flex: 0 0 auto; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 10px;
+  background: transparent; color: var(--muted); cursor: pointer; transition: 0.15s;
   display: inline-flex; align-items: center; justify-content: center;
 }
-.comp-icon svg { display: block; }
-.comp-icon:hover { color: #fff; border-color: var(--accent); background: var(--panel); }
-.comp-icon:active { transform: scale(0.96); }
-.comp-icon[hidden] { display: none !important; }
+.attach-btn svg { display: block; }
+.attach-btn:hover { color: var(--accent); background: var(--panel); }
+.attach-btn:active { transform: scale(0.94); }
+.attach-btn[hidden] { display: none !important; }
+
+/* Chat toggles (Thinking / Web / Page) — sober icon buttons, coloured when active. */
+.chat-toggles { display: flex; align-items: center; gap: 3px; min-width: 0; }
+.ctoggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 9px;
+  background: transparent; color: var(--muted); cursor: pointer; transition: 0.15s; user-select: none;
+}
+.ctoggle svg { display: block; }
+.ctoggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.ctoggle:hover { color: var(--text); border-color: var(--accent-2); }
+.ctoggle:has(input:checked) {
+  color: var(--accent); background: var(--grad-soft); border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
 
 /* Attachment preview strip */
 .attach-strip { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -418,7 +459,7 @@ body.rail-right .rail { border-right: 0; border-left: 1px solid var(--border-sof
 
 /* ----- Code blocks + artifacts ----- */
 .code-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin: 8px 0; }
-.code-wrap.artifact { border-color: rgba(139, 92, 246, 0.5); box-shadow: 0 2px 12px rgba(124, 58, 237, 0.16); }
+.code-wrap.artifact { border-color: color-mix(in srgb, var(--accent) 50%, transparent); box-shadow: 0 2px 12px color-mix(in srgb, var(--accent-3) 18%, transparent); }
 .code-bar { display: flex; align-items: center; gap: 6px; padding: 5px 8px; background: var(--panel-2); border-bottom: 1px solid var(--border); }
 .code-wrap.artifact .code-bar { background: var(--grad-soft); }
 .code-lang { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-right: auto; font-weight: 700; }
@@ -432,7 +473,7 @@ body.rail-right .rail { border-right: 0; border-left: 1px solid var(--border-sof
 /* ----- Thinking block ----- */
 .think {
   align-self: stretch; max-width: 100%; background: var(--grad-soft);
-  border: 1px solid rgba(139, 92, 246, 0.35); border-radius: 11px; padding: 7px 11px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 11px; padding: 7px 11px;
   font-size: 12px; color: var(--muted);
 }
 .think summary { cursor: pointer; color: var(--accent); user-select: none; font-weight: 600; }
@@ -474,7 +515,7 @@ body.mode-code #confirmBar { display: none !important; }
 .code-launch .cl-feats {
   list-style: none; margin: 4px 0 0; padding: 12px; width: 100%; text-align: left;
   display: flex; flex-direction: column; gap: 7px; font-size: 12px;
-  background: var(--grad-soft); border: 1px solid rgba(139, 92, 246, 0.32); border-radius: 12px;
+  background: var(--grad-soft); border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent); border-radius: 12px;
 }
 .code-launch .cl-sec { margin: 0; font-size: 11px; line-height: 1.45; }
 
@@ -539,7 +580,7 @@ body.mode-code #confirmBar { display: none !important; }
 }
 .cmp-btn {
   font-size: 11.5px; padding: 4px 11px; border-radius: 7px; flex: 0 0 auto;
-  border: 1px solid rgba(139, 92, 246, 0.5); background: var(--grad-soft); color: var(--text); font-weight: 600;
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); background: var(--grad-soft); color: var(--text); font-weight: 600;
 }
 .cmp-btn:hover { border-color: var(--accent); }
 .cmp-btn:disabled { opacity: 0.5; cursor: default; }

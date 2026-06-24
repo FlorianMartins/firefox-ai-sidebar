@@ -105,10 +105,12 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
   }
   const action = MENU_ACTION[info.menuItemId];
   if (!action) return;
-  // Fire-and-forget the storage write, then open synchronously (keep the gesture).
+  // Open the sidebar FIRST so the user gesture is preserved (Firefox requires it), then
+  // queue the action. The sidebar consumes it on load AND via a storage listener, so it
+  // runs whether the sidebar was closed or already open.
+  openSidebar(tab);
   browser.storage.local.set({
     pendingAction: { action, text: info.selectionText || "", ts: Date.now() },
   });
-  openSidebar(tab);
 });
 

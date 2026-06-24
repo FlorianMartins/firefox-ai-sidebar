@@ -94,6 +94,10 @@
           <select id="uiLang">
             <option value="en" data-i18n="opt.uiEn">English (default)</option>
             <option value="fr" data-i18n="opt.uiFr">French</option>
+            <option value="es">Español</option>
+            <option value="de">Deutsch</option>
+            <option value="it">Italiano</option>
+            <option value="pt">Português</option>
           </select>
         </label>
         <label><span data-i18n="opt.lang.resp">AI response language</span>
@@ -109,7 +113,19 @@
 
       <section id="sec-appearance">
         <h2 data-i18n="opt.layout.h">🎨 Appearance &amp; layout</h2>
-        <label><span data-i18n="opt.layout.rail">Tabs menu position</span>
+        <label><span data-i18n="opt.theme.label">Theme</span>
+          <select id="theme"></select>
+        </label>
+        <p class="muted" data-i18n="opt.theme.note">Pick a theme, then optionally fine-tune individual colours on top of it.</p>
+        <div class="theme-colors">
+          <label class="colpick"><span data-i18n="opt.theme.accent">Accent</span><input type="color" id="col_accent" /></label>
+          <label class="colpick"><span data-i18n="opt.theme.accent2">Accent 2 (gradient)</span><input type="color" id="col_accent2" /></label>
+          <label class="colpick"><span data-i18n="opt.theme.bg">Background</span><input type="color" id="col_bg" /></label>
+          <label class="colpick"><span data-i18n="opt.theme.panel">Surface</span><input type="color" id="col_panel" /></label>
+          <label class="colpick"><span data-i18n="opt.theme.text">Text</span><input type="color" id="col_text" /></label>
+        </div>
+        <button id="themeReset" class="ghost" data-i18n="opt.theme.reset">↺ Reset colours to theme</button>
+        <label style="margin-top:14px"><span data-i18n="opt.layout.rail">Tabs menu position</span>
           <select id="railSide">
             <option value="left" data-i18n="opt.layout.left">Left (default)</option>
             <option value="right" data-i18n="opt.layout.right">Right</option>
@@ -160,7 +176,7 @@
       </section>
 
       <div class="actions">
-        <button id="save" class="grad" data-i18n="opt.save">Save</button>
+        <span class="muted" data-i18n="opt.autosaveNote">Changes are saved automatically.</span>
         <span id="status" class="muted"></span>
       </div>
     </main>

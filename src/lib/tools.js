@@ -171,9 +171,21 @@ async function sendToActiveTab(message) {
   return sendToTab(tab.id, message);
 }
 
+// A navigation/open that triggers a file download (or a blob/data download) is a
+// "very sensitive" action and is confirmed even in "Allow" mode.
+function isSensitiveUrl(url) {
+  if (!url || typeof url !== "string") return false;
+  if (/^(blob:|data:)/i.test(url)) return true;
+  return /\.(zip|exe|dmg|msi|pkg|apk|iso|deb|rpm|7z|rar|tar|gz|jar|bin|app)(\?|#|$)/i.test(url);
+}
+
 // Execute a tool call.
 // Options:
 //   confirmActions / confirmFn : confirmation gate for write tools.
+//     - confirmActions=true  (manual mode): confirm EVERY write action up-front.
+//     - confirmActions=false ("Allow" mode): run freely, BUT still confirm very
+//       sensitive actions (downloads via URL, and sensitive clicks/submits flagged
+//       by the content script — reserve / book / delete / sign-up / install…).
 //   guard : { blockPayments } — forwarded to the page so the content script can
 //           refuse payment/checkout interactions in code (defence in depth).
 export async function executeTool(name, input, opts = {}) {
@@ -181,9 +193,20 @@ export async function executeTool(name, input, opts = {}) {
   const def = TOOLS.find((t) => t.name === name);
   if (!def) return { error: `Unknown tool: ${name}` };
 
+  // Manual mode: confirm every write action. If approved, mark it confirmed so the
+  // sensitive-action gate below (and in the page) doesn't prompt a second time.
+  let confirmed = false;
   if (def.write && confirmActions && confirmFn) {
     const ok = await confirmFn(name, input);
     if (!ok) return { error: "Action declined by the user." };
+    confirmed = true;
+  }
+
+  // "Allow" mode: still confirm a sensitive NAVIGATION/download before doing it.
+  if (!confirmed && confirmFn && (name === "navigate" || name === "open_tab") && isSensitiveUrl(input && input.url)) {
+    const ok = await confirmFn(name, { sensitive: "download", url: input.url });
+    if (!ok) return { error: "Action declined by the user." };
+    confirmed = true;
   }
 
   try {
@@ -196,16 +219,26 @@ export async function executeTool(name, input, opts = {}) {
         return await sendToTab(input.tabId, { type: "read_page" });
       case "find_elements":
         return await sendToActiveTab({ type: "find_elements", query: input.query || "" });
-      case "click_element":
-        return await sendToActiveTab({ type: "click_element", ref: input.ref, guard });
-      case "fill_input":
-        return await sendToActiveTab({
-          type: "fill_input",
-          ref: input.ref,
-          value: input.value,
-          submit: !!input.submit,
-          guard,
-        });
+      case "click_element": {
+        let res = await sendToActiveTab({ type: "click_element", ref: input.ref, guard, confirmed });
+        // The page flagged a very sensitive control → confirm, then re-issue.
+        if (res && res.confirm && confirmFn) {
+          const ok = await confirmFn("click_element", { sensitive: res.action, label: res.label });
+          if (!ok) return { error: "Action declined by the user." };
+          res = await sendToActiveTab({ type: "click_element", ref: input.ref, guard, confirmed: true });
+        }
+        return res;
+      }
+      case "fill_input": {
+        const payload = { type: "fill_input", ref: input.ref, value: input.value, submit: !!input.submit, guard };
+        let res = await sendToActiveTab({ ...payload, confirmed });
+        if (res && res.confirm && confirmFn) {
+          const ok = await confirmFn("fill_input", { sensitive: res.action, label: res.label });
+          if (!ok) return { error: "Action declined by the user." };
+          res = await sendToActiveTab({ ...payload, confirmed: true });
+        }
+        return res;
+      }
       case "scroll_page":
         return await sendToActiveTab({ type: "scroll_page", direction: input.direction });
 

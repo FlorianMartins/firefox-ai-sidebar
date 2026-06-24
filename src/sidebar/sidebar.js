@@ -14,6 +14,7 @@ import { executeTool } from "../lib/tools.js";
 import { configureMarkdown, renderMarkdown, enhanceArtifacts } from "../lib/markdown.js";
 import { PROVIDERS, PROVIDER_ORDER, modelFor, keyFor, connectedProviders, defaultSearchModel, IMAGE_SIZES, WRITING_PRESETS } from "../lib/models.js";
 import { connectOpenRouter } from "../lib/auth.js";
+import { applyTheme } from "../lib/theme.js";
 import { t, setLang, applyDom } from "../lib/i18n.js";
 import {
   listConversations, getConversation, saveConversation, deleteConversation,
@@ -32,6 +33,8 @@ const els = {
   expandTab: $("expandTab"),
   brand: $("brandToggle"),
   attachBtn: $("attachBtn"),
+  composerMain: $("composerMain"),
+  toolsLeft: $("toolsLeft"),
   attachInput: $("attachInput"),
   attachStrip: $("attachStrip"),
   dropOverlay: $("dropOverlay"),
@@ -71,12 +74,12 @@ const els = {
   emptyOnboard: $("emptyOnboard"),
   emptyGreeting: $("emptyGreeting"),
   input: $("input"),
-  send: $("send"),
   stop: $("stop"),
   rail: $("rail"),
   codeView: $("codeView"),
   openCodeApp: $("openCodeApp"),
   codeAppUrlLabel: $("codeAppUrlLabel"),
+  controls: $("controls"),
   chatControls: $("chatControls"),
   translateControls: $("translateControls"),
   improveControls: $("improveControls"),
@@ -198,9 +201,10 @@ function agentActive() { return mode === "agent"; }
 async function init() {
   configureMarkdown();
   settings = await getSettings();
-  setLang(settings.uiLang || "en");   // English by default; French chosen in Settings
+  applyTheme(settings.theme || "dark", settings.themeColors); // colour theme + custom overrides
+  setLang(settings.uiLang || "en");   // English by default; other languages chosen in Settings
   applyDom(document);                  // fill all data-i18n static markup
-  document.documentElement.lang = settings.uiLang === "fr" ? "fr" : "en";
+  document.documentElement.lang = settings.uiLang || "en";
   document.body.classList.toggle("rail-right", settings.railSide === "right");
   document.body.classList.toggle("rail-collapsed", !!settings.railHidden);
   populateModelSelector();
@@ -219,6 +223,11 @@ async function init() {
   setMode(settings.mode || "chat");
   setupPageAwareness();
   autoListConnected();           // refresh available models in the background
+  // Run a queued context-menu action whenever it appears — even if the sidebar was
+  // already open when the user clicked the menu (that's the "right-click does nothing" fix).
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes.pendingAction && changes.pendingAction.newValue) consumePendingAction();
+  });
   await refreshCurrentPage();
   await consumePendingAction();
 }
@@ -1037,6 +1046,24 @@ async function sendToTab(tabId, msg) {
     } catch (_) { throw e; }
   }
 }
+// ----- Agent activity glow --------------------------------------------------
+// A pulsing border on the page the agent is acting on (à la Perplexity). We glow the
+// ACTIVE tab and re-assert it as the agent navigates/switches; cleared when it stops.
+const glowedTabs = new Set();
+async function agentGlowActiveTab() {
+  try {
+    const id = await getActiveTabId();
+    if (id == null) return;
+    glowedTabs.add(id);
+    try { await sendToTab(id, { type: "agent_glow", on: true }); } catch (_) {}
+  } catch (_) {}
+}
+async function clearAgentGlow() {
+  for (const id of Array.from(glowedTabs)) {
+    try { await browser.tabs.sendMessage(id, { type: "agent_glow", on: false }); } catch (_) {}
+  }
+  glowedTabs.clear();
+}
 function loadImage(src) {
   return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
 }
@@ -1152,17 +1179,23 @@ function setMode(next) {
   setSettings({ mode: next });
   if (CHAT_MODES.includes(next)) loadSessionToGlobals(next);
   els.rail.querySelectorAll(".railtab").forEach((b) => b.classList.toggle("active", b.dataset.mode === next));
-  // The Thinking/Web/Page chips belong to Chat only — they have no role in Agent mode
-  // (which drives tools), so they're hidden there.
+  // The Thinking/Web/Page toggles (now inside the composer) belong to Chat only.
   els.chatControls.classList.toggle("hidden", next !== "chat");
   els.translateControls.classList.toggle("hidden", next !== "translate");
   els.improveControls.classList.toggle("hidden", next !== "improve");
   els.imageControls.classList.toggle("hidden", next !== "image");
   els.pdfControls.classList.toggle("hidden", next !== "pdf");
+  // The per-mode controls row is only useful for translate/improve/image/pdf; hide it
+  // entirely on Chat/Agent/Code so there's no empty bar.
+  els.controls.hidden = !["translate", "improve", "image", "pdf"].includes(next);
   // Attach (+) is offered on Chat/Agent/Translate/Improve/Image only.
   const composeExtras = ["chat", "agent", "translate", "improve", "image"].includes(next);
   els.attachBtn.hidden = !composeExtras;
   if (!composeExtras && attachments.length) clearAttachments();
+  // On the Chat tab the "+" sits at the bottom-left (beside the toggles); on every other
+  // tab it sits next to the text in the first row.
+  if (next === "chat") els.toolsLeft.appendChild(els.attachBtn);
+  else els.composerMain.insertBefore(els.attachBtn, els.input);
   els.modelFilterPanel.classList.add("hidden");
   if (mainCombo) mainCombo.close();
   document.body.classList.toggle("mode-code", next === "code");
@@ -1171,6 +1204,7 @@ function setMode(next) {
   refreshModelUI(); // Image tab lists image models; others list chat models.
   if (CHAT_MODES.includes(next)) restoreMode(next); // re-attach this tab's own message nodes
   if (next === "code") updateCodeLauncher();
+  updatePageBar(); // Page bar is Chat-only — hide it (and its popup) on other tabs
   updateEmptyState();
   // If the history panel is open, refresh it to show THIS workspace's conversations.
   if (!els.historyPanel.classList.contains("hidden")) renderHistoryList();
@@ -1239,10 +1273,17 @@ async function refreshCurrentPage() {
     currentPage = null;
     els.pageTitle.textContent = t("page.none");
   }
-  // Keep the page bar visible whenever the Page toggle is ON — even when the active
-  // tab isn't readable — so the page chip AND the 📑 multi-tab picker stay reachable
-  // (that's the "page/tab selection popup disappeared" fix).
-  els.pageBar.classList.toggle("hidden", !els.pageCtx.checked);
+  updatePageBar();
+}
+
+// The Page bar (page seen by the AI + element/region tools + 📑 tab picker) is a
+// CHAT-ONLY feature. Show it only on the Chat tab when the Page toggle is on; hide it
+// — and close its tab-picker popup — everywhere else (that's the "Page popup stays open
+// after switching workspace" fix).
+function updatePageBar() {
+  const show = mode === "chat" && els.pageCtx.checked;
+  els.pageBar.classList.toggle("hidden", !show);
+  if (!show) els.tabsPanel.classList.add("hidden");
 }
 
 // ----- Multi-tab context ----------------------------------------------------
@@ -1726,11 +1767,19 @@ function toggleSearch() {
   if (els.searchBar.classList.contains("hidden")) openSearch(); else closeSearch();
 }
 
-// ----- Pending actions ------------------------------------------------------
+// ----- Pending actions (from the right-click context menu) ------------------
+// The background script writes a `pendingAction` to storage when a context-menu item
+// is clicked, then tries to open the sidebar. We consume it on load AND whenever it
+// changes — so it works whether the sidebar was closed (opens → init) or ALREADY OPEN
+// (the storage listener catches it). The ts guard prevents a double-run.
+let lastPendingTs = 0;
 async function consumePendingAction() {
   const { pendingAction } = await browser.storage.local.get("pendingAction");
   if (!pendingAction || Date.now() - pendingAction.ts > 60000) return;
+  if (pendingAction.ts === lastPendingTs) return; // already handled
+  lastPendingTs = pendingAction.ts;
   await browser.storage.local.remove("pendingAction");
+  if (mode !== "chat" && mode !== "agent") setMode("chat"); // quick actions render in the chat area
   runQuickAction(pendingAction.action, pendingAction.text);
 }
 
@@ -1758,7 +1807,6 @@ function wire() {
 
   // Click the brand/logo to show or hide the workspace tabs rail.
   els.brand.addEventListener("click", toggleRail);
-  els.brand.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleRail(); } });
 
   // Composer: attachments (+).
   els.attachBtn.addEventListener("click", () => els.attachInput.click());
@@ -1805,9 +1853,7 @@ function wire() {
     });
   bindToggle(els.thinking, "thinking");
   bindToggle(els.webSearch, "webSearch");
-  bindToggle(els.pageCtx, "includePageContext", () =>
-    els.pageBar.classList.toggle("hidden", !els.pageCtx.checked)
-  );
+  bindToggle(els.pageCtx, "includePageContext", updatePageBar);
   bindToggle(els.useTabs, "includeSelectedTabs");
 
   els.rail.querySelectorAll(".railtab").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
@@ -1884,7 +1930,7 @@ function wire() {
   els.tabsRefresh.addEventListener("click", (e) => { e.stopPropagation(); buildTabsList(); });
   els.tabsList.addEventListener("change", persistSelectedTabs);
 
-  els.send.addEventListener("click", onSend);
+  // No Send button — Enter sends (Shift+Enter = newline).
   els.input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }
   });
@@ -1907,6 +1953,10 @@ function wire() {
     if (changes.uiLang) { location.reload(); return; }
     if (changes.railSide) document.body.classList.toggle("rail-right", changes.railSide.newValue === "right");
     if (changes.railHidden) document.body.classList.toggle("rail-collapsed", !!changes.railHidden.newValue);
+    if (changes.theme || changes.themeColors) {
+      const s2 = await getSettings();
+      applyTheme(s2.theme || "dark", s2.themeColors);
+    }
     const connChanged = !!(changes.keys || changes.baseUrls || changes.localEnabled);
     if (!connChanged && !changes.modelLists && !changes.orModels && !changes.codeAppUrl && !changes.orFreeOnly) return;
     settings = await getSettings();
@@ -1919,7 +1969,7 @@ function wire() {
 
 function autoGrow() {
   els.input.style.height = "auto";
-  els.input.style.height = Math.min(els.input.scrollHeight, 150) + "px";
+  els.input.style.height = Math.min(els.input.scrollHeight, 200) + "px";
 }
 function resetComposerHeight() { els.input.style.height = "auto"; }
 
@@ -2093,7 +2143,14 @@ function currentKeyMissing(providerId) {
 }
 function confirmAction(name, input) {
   return new Promise((resolve) => {
-    els.confirmText.textContent = t("confirm.prompt", { name, input: JSON.stringify(input).slice(0, 120) });
+    // A sensitive action (download / reserve / delete / sign-up…) gets a clear warning
+    // and shows what it's about to do; ordinary (manual-mode) actions use the generic text.
+    if (input && input.sensitive) {
+      const what = input.label || input.url || "";
+      els.confirmText.textContent = t("confirm.sensitive", { action: input.sensitive, what: String(what).slice(0, 80) });
+    } else {
+      els.confirmText.textContent = t("confirm.prompt", { name, input: JSON.stringify(input).slice(0, 120) });
+    }
     els.confirmBar.classList.remove("hidden");
     const cleanup = (v) => {
       els.confirmBar.classList.add("hidden");
@@ -2248,12 +2305,10 @@ async function getSelection() {
 }
 function startBusy() {
   busy = true;
-  els.send.classList.add("hidden");
-  els.stop.classList.remove("hidden");
+  els.stop.classList.remove("hidden"); // Stop button appears while streaming (no Send button — Enter sends)
   abortController = new AbortController();
 }
 function endBusy() {
-  els.send.classList.remove("hidden");
   els.stop.classList.add("hidden");
   abortController = null;
   busy = false;
@@ -2405,16 +2460,19 @@ async function sendToModel(displayText, modelContent, { forceWeb = false, runMod
   const tools = activeTools({ agentMode });
   const pending = addPendingIndicator();
   const sink = makeSink(badge, els.thinking.checked, pending);
+  if (agentMode) agentGlowActiveTab(); // glow the page border while the agent works
   try {
     await runConversation({
       provider, system, history: turnHistory, tools,
       onText: sink.onText, onThink: sink.onThink,
-      onToolStart: (call) => { sink.finalize(); addMessage("tool", `→ ${call.name}(${JSON.stringify(call.input).slice(0, 80)})`); },
-      onToolEnd: (call, out) => addMessage("tool", out && out.blocked ? `   🛡 ${out.error}` : `   ${out && out.error ? "✗ " + out.error : "✓ ok"}`),
-      // P2 — agent permission: "auto" runs every (non-payment) action without asking;
-      // "manual" (default) confirms each one. The anti-purchase guard applies in BOTH.
+      onToolStart: (call) => { sink.finalize(); if (agentMode) agentGlowActiveTab(); addMessage("tool", `→ ${call.name}(${JSON.stringify(call.input).slice(0, 80)})`); },
+      onToolEnd: (call, out) => { if (agentMode) agentGlowActiveTab(); addMessage("tool", out && out.blocked ? `   🛡 ${out.error}` : `   ${out && out.error ? "✗ " + out.error : "✓ ok"}`); },
+      // Agent permission: "manual" confirms EVERY action; "auto" (Allow, default) runs
+      // freely but still confirms VERY SENSITIVE actions (downloads, reserve/book,
+      // delete, sign-up, install…). confirmFn is therefore available in BOTH modes; the
+      // anti-purchase guard applies in both too.
       confirmActions: settings.agentPermission !== "auto",
-      confirmFn: (agentMode && settings.agentPermission !== "auto") ? confirmAction : null,
+      confirmFn: agentMode ? confirmAction : null,
       guard: { blockPayments: settings.blockPayments },
       signal: abortController.signal,
     });
@@ -2428,6 +2486,7 @@ async function sendToModel(displayText, modelContent, { forceWeb = false, runMod
     showRunError(turnSel.providerId, e, turnSel.modelId);
   } finally {
     removePending(pending);
+    if (agentMode) clearAgentGlow(); // stop the page-border glow when the agent finishes
     endBusy();
     await saveSession(sess, sessMode, sel);
     // Keep an open history panel in sync (e.g. the new conversation gets its title).

@@ -8,6 +8,8 @@
 // it in at load time; dynamic strings call `t(key, vars)` directly. Interpolation
 // uses {name} placeholders replaced from the `vars` object.
 
+import { ES, DE, IT, PT } from "./i18n-langs.js";
+
 let lang = "en";
 
 const EN = {
@@ -252,6 +254,7 @@ const EN = {
   "or.enableLink": "→ Enable free models on OpenRouter",
   "err.image": "Image: {msg}",
   "confirm.prompt": "Allow the action “{name}”? {input}",
+  "confirm.sensitive": "⚠ Sensitive action ({action}): allow “{what}”?",
   "err.noKeyModel": "No key for this model. Click “Connect / Add a provider” (⚙).",
   "badge.web": "🌐 Web search · {label} · {model}",
   "badge.agent": "🤖 Agent · {label} · {model}",
@@ -353,7 +356,7 @@ const EN = {
   "opt.agent.model": "Agent model",
   "opt.agent.perm": "Agent permissions",
   "opt.agent.permManual": "Manual approval — ask before each action",
-  "opt.agent.permAuto": "Allow everything — no approval prompt",
+  "opt.agent.permAuto": "Allow (default) — run automatically, but still confirm sensitive actions (download, reserve, delete, sign-up…)",
   "opt.agent.p2": "With <b>manual approval</b> (recommended), every state-changing action (click, typing, navigation…) asks for your consent. With <b>allow everything</b>, the agent chains actions without confirmation. In both cases the <b>anti-purchase guardrail</b> stays active: the agent can never pay.",
   "opt.web.h": "🌐 Web search",
   "opt.web.p": "In <b>Web</b> mode the request is sent to a model that can search the web — preferably <b>Perplexity</b> (Sonar) or a <b>free OpenRouter</b> model (built-in web plugin), to avoid spending on Claude. Leave <b>Auto</b> for an automatic pick among your connected providers.",
@@ -373,6 +376,17 @@ const EN = {
   "opt.lang.preset": "Default writing style (Improve mode)",
   "opt.lang.target": "Translation target language",
   "opt.layout.h": "🎨 Appearance & layout",
+  "opt.theme.label": "Theme",
+  "opt.theme.note": "Pick a theme, then optionally fine-tune individual colours on top of it.",
+  "opt.theme.accent": "Accent",
+  "opt.theme.accent2": "Accent 2 (gradient)",
+  "opt.theme.bg": "Background",
+  "opt.theme.panel": "Surface",
+  "opt.theme.text": "Text",
+  "opt.theme.pick": "Eyedropper — pick a colour from anywhere on screen",
+  "opt.theme.pickOs": "Open the colour picker — use its eyedropper to grab any colour on screen",
+  "opt.theme.pickHint": "Click a colour to capture it · Esc to cancel",
+  "opt.theme.reset": "↺ Reset colours to theme",
   "opt.layout.rail": "Tabs menu position",
   "opt.layout.left": "Left (default)",
   "opt.layout.right": "Right",
@@ -397,8 +411,10 @@ const EN = {
   "opt.eff.routing": "Smart routing: use a cheap/free model for summaries & compaction (premium model kept for answers)",
   "opt.eff.utility": "Utility model (housekeeping)",
   "opt.eff.utilityAuto": "Auto (cheapest free connected model)",
+  "opt.autosaveNote": "Changes are saved automatically.",
   "opt.save": "Save",
   "opt.saved": "✓ Saved.",
+  "opt.savedAuto": "✓ Saved automatically",
   "opt.cleared": "✓ History cleared.",
   // dynamic (options.js)
   "opt.dyn.connecting": "Connecting…",
@@ -662,6 +678,7 @@ const FR = {
   "or.enableLink": "→ Activer les modèles gratuits sur OpenRouter",
   "err.image": "Image : {msg}",
   "confirm.prompt": "Autoriser l'action « {name} » ? {input}",
+  "confirm.sensitive": "⚠ Action sensible ({action}) : autoriser « {what} » ?",
   "err.noKeyModel": "Aucune clé pour ce modèle. Cliquez « Connexion / Ajouter un fournisseur » (⚙).",
   "badge.web": "🌐 Recherche web · {label} · {model}",
   "badge.agent": "🤖 Agent · {label} · {model}",
@@ -759,7 +776,7 @@ const FR = {
   "opt.agent.model": "Modèle de l'agent",
   "opt.agent.perm": "Autorisations de l'agent",
   "opt.agent.permManual": "Validation manuelle — demander avant chaque action",
-  "opt.agent.permAuto": "Tout autoriser — aucune demande d'autorisation",
+  "opt.agent.permAuto": "Autoriser (défaut) — automatique, mais confirme quand même les actions sensibles (téléchargement, réservation, suppression, inscription…)",
   "opt.agent.p2": "En <b>validation manuelle</b> (recommandé), chaque action modifiant l'état (clic, saisie, navigation…) demande votre accord. En <b>tout autoriser</b>, l'agent enchaîne les actions sans confirmation. Dans les deux cas, le <b>garde-fou anti-achat</b> reste actif : l'agent ne peut jamais payer.",
   "opt.web.h": "🌐 Recherche web",
   "opt.web.p": "En mode <b>Web</b>, la requête est envoyée à un modèle capable de chercher sur le web — de préférence <b>Perplexity</b> (Sonar) ou un modèle <b>gratuit OpenRouter</b> (plugin web intégré), pour éviter de dépenser sur Claude. Laissez <b>Auto</b> pour un choix automatique parmi vos fournisseurs connectés.",
@@ -779,6 +796,17 @@ const FR = {
   "opt.lang.preset": "Style d'écriture par défaut (mode Améliorer)",
   "opt.lang.target": "Langue cible des traductions",
   "opt.layout.h": "🎨 Apparence & disposition",
+  "opt.theme.label": "Thème",
+  "opt.theme.note": "Choisissez un thème, puis ajustez éventuellement certaines couleurs par-dessus.",
+  "opt.theme.accent": "Accent",
+  "opt.theme.accent2": "Accent 2 (dégradé)",
+  "opt.theme.bg": "Arrière-plan",
+  "opt.theme.panel": "Surface",
+  "opt.theme.text": "Texte",
+  "opt.theme.pick": "Pipette — capturer une couleur n'importe où à l'écran",
+  "opt.theme.pickOs": "Ouvrir le sélecteur de couleur — utilisez sa pipette pour capturer n'importe quelle couleur à l'écran",
+  "opt.theme.pickHint": "Cliquez sur une couleur pour la capturer · Échap pour annuler",
+  "opt.theme.reset": "↺ Réinitialiser les couleurs du thème",
   "opt.layout.rail": "Position du menu d'onglets",
   "opt.layout.left": "À gauche (défaut)",
   "opt.layout.right": "À droite",
@@ -803,8 +831,10 @@ const FR = {
   "opt.eff.routing": "Routage intelligent : un modèle bon marché/gratuit pour les résumés & le compactage (le modèle premium reste pour les réponses)",
   "opt.eff.utility": "Modèle utilitaire (tâches internes)",
   "opt.eff.utilityAuto": "Auto (modèle gratuit le moins cher connecté)",
+  "opt.autosaveNote": "Les modifications sont enregistrées automatiquement.",
   "opt.save": "Enregistrer",
   "opt.saved": "✓ Enregistré.",
+  "opt.savedAuto": "✓ Enregistré automatiquement",
   "opt.cleared": "✓ Historique effacé.",
   "opt.dyn.connecting": "Connexion…",
   "opt.dyn.connected": "✓ Connecté à {label}.",
@@ -837,7 +867,7 @@ const FR = {
   "opt.uiFr": "Français",
 };
 
-const DICT = { en: EN, fr: FR };
+const DICT = { en: EN, fr: FR, es: ES, de: DE, it: IT, pt: PT };
 
 export function setLang(l) {
   lang = l === "fr" ? "fr" : "en";

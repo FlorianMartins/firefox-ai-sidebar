@@ -3,9 +3,128 @@ import { PROVIDERS, PROVIDER_ORDER, IMAGE_SIZES, WRITING_PRESETS, isConnected } 
 import { connectOpenRouter } from "../lib/auth.js";
 import { listModels } from "../lib/providers.js";
 import { clearConversations } from "../lib/history.js";
+import { THEMES, CUSTOM_KEYS, applyTheme, effectivePalette } from "../lib/theme.js";
 import { t, setLang, applyDom } from "../lib/i18n.js";
 
 const $ = (id) => document.getElementById(id);
+
+// ----- Theme + custom colours -----------------------------------------------
+let curTheme = "dark";
+let curColors = {}; // overrides applied on top of the theme
+const COL_IDS = { accent: "col_accent", accent2: "col_accent2", bg: "col_bg", panel: "col_panel", text: "col_text" };
+function syncColorPickers() {
+  const pal = effectivePalette(curTheme, curColors);
+  for (const k of CUSTOM_KEYS) { const el = $(COL_IDS[k]); if (el) el.value = pal[k]; }
+}
+function applyThemeLive() { applyTheme(curTheme, curColors); }
+
+function rgbToHex(r, g, b) {
+  return "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+// Real eyedropper for browsers without the EyeDropper API (Firefox): capture the
+// screen, freeze a snapshot, and let the user click the exact colour to pick — works
+// for any app on screen (Discord, etc.). Returns a #hex string, or null if cancelled.
+async function screenEyedropper() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) return null;
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+  } catch (_) { return null; } // user cancelled the share prompt
+  const video = document.createElement("video");
+  video.muted = true;
+  video.srcObject = stream;
+  try { await video.play(); } catch (_) {}
+  await new Promise((r) => setTimeout(r, 220)); // let a frame paint
+  const w = video.videoWidth || 1, h = video.videoHeight || 1;
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(video, 0, 0, w, h);
+  stream.getTracks().forEach((tk) => tk.stop());
+
+  return await new Promise((resolve) => {
+    const scale = Math.min(window.innerWidth / w, window.innerHeight / h);
+    const dw = Math.round(w * scale), dh = Math.round(h * scale);
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#000;cursor:crosshair";
+    const img = document.createElement("img");
+    img.src = canvas.toDataURL();
+    img.draggable = false;
+    img.style.cssText = "width:" + dw + "px;height:" + dh + "px;display:block";
+    overlay.appendChild(img);
+    const badge = document.createElement("div");
+    badge.style.cssText = "position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:100000;display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:10px;background:#161922;color:#fff;font:13px/1 system-ui,sans-serif;box-shadow:0 8px 28px rgba(0,0,0,.55)";
+    const sw = document.createElement("span");
+    sw.style.cssText = "width:22px;height:22px;border-radius:5px;border:1px solid rgba(255,255,255,.25);background:#000";
+    const lbl = document.createElement("span");
+    lbl.textContent = t("opt.theme.pickHint");
+    badge.appendChild(sw); badge.appendChild(lbl);
+    overlay.appendChild(badge);
+    const colorAt = (e) => {
+      const r = img.getBoundingClientRect();
+      const x = Math.floor((e.clientX - r.left) / scale), y = Math.floor((e.clientY - r.top) / scale);
+      if (x < 0 || y < 0 || x >= w || y >= h) return null;
+      const d = ctx.getImageData(x, y, 1, 1).data;
+      return rgbToHex(d[0], d[1], d[2]);
+    };
+    const cleanup = () => { overlay.remove(); document.removeEventListener("keydown", onKey, true); };
+    const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); cleanup(); resolve(null); } };
+    overlay.addEventListener("mousemove", (e) => { const hx = colorAt(e); if (hx) { sw.style.background = hx; lbl.textContent = hx; } });
+    overlay.addEventListener("click", (e) => { const hx = colorAt(e); cleanup(); resolve(hx); });
+    document.addEventListener("keydown", onKey, true);
+    document.body.appendChild(overlay);
+  });
+}
+
+function buildThemeControls() {
+  const sel = $("theme");
+  if (sel) {
+    sel.innerHTML = "";
+    for (const [key, th] of Object.entries(THEMES)) {
+      const o = document.createElement("option");
+      o.value = key; o.textContent = th.label;
+      sel.appendChild(o);
+    }
+    sel.value = curTheme;
+    sel.addEventListener("change", () => {
+      curTheme = sel.value;
+      curColors = {}; // a fresh theme starts from its own palette
+      syncColorPickers(); applyThemeLive();
+    });
+  }
+  const hasEyeDropper = typeof window !== "undefined" && "EyeDropper" in window;
+  for (const k of CUSTOM_KEYS) {
+    const el = $(COL_IDS[k]);
+    if (!el) continue;
+    el.addEventListener("input", () => { curColors = { ...curColors, [k]: el.value }; applyThemeLive(); });
+    // Eyedropper button: pick ANY colour on screen (e.g. Discord's). On Chromium it
+    // uses the native EyeDropper API (one-click pick anywhere). On Firefox (no EyeDropper
+    // API) it captures the screen and lets you click the colour on a frozen snapshot.
+    const drop = document.createElement("button");
+    drop.type = "button";
+    drop.className = "eyedrop";
+    drop.title = t("opt.theme.pick");
+    drop.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/></svg>';
+    drop.addEventListener("click", async () => {
+      let hex = null;
+      if (hasEyeDropper) {
+        try { const res = await new window.EyeDropper().open(); hex = res && res.sRGBHex; } catch (_) { /* cancelled */ }
+      } else {
+        hex = await screenEyedropper();
+      }
+      if (hex) {
+        el.value = hex;
+        curColors = { ...curColors, [k]: hex };
+        applyThemeLive();
+        scheduleAutoSave();
+      }
+    });
+    el.insertAdjacentElement("afterend", drop);
+  }
+  const reset = $("themeReset");
+  if (reset) reset.addEventListener("click", () => { curColors = {}; syncColorPickers(); applyThemeLive(); });
+  syncColorPickers();
+}
 
 // Most-spoken languages for the AI response language (English first / default).
 const LANGUAGES = [
@@ -343,9 +462,13 @@ function buildQuickNav() {
 
 async function load() {
   settings = await getSettings();
-  setLang(settings.uiLang || "en");       // English default; French via the uiLang setting
+  curTheme = settings.theme || "dark";
+  curColors = { ...(settings.themeColors || {}) };
+  applyThemeLive();                        // theme the options page too
+  setLang(settings.uiLang || "en");       // English default; other languages via the uiLang setting
   applyDom(document);                      // fill all data-i18n static markup
-  document.documentElement.lang = settings.uiLang === "fr" ? "fr" : "en";
+  document.documentElement.lang = settings.uiLang || "en";
+  buildThemeControls();
   buildQuickNav();                         // jump pins to each section
   modelLists = { ...(settings.modelLists || {}) };
   buildProviderFields();
@@ -375,7 +498,10 @@ async function load() {
   refreshModelLists();
 }
 
-async function save() {
+// Read every control into a settings object. `models` is intentionally NOT written —
+// the sidebar remembers the last-used model per provider, and overwriting it here
+// would undo that.
+function collectSettings() {
   const keys = {};
   const baseUrls = {};
   const localEnabled = {};
@@ -387,15 +513,15 @@ async function save() {
     const lc = $(`local_${id}`);
     if (lc && lc.checked) localEnabled[id] = true;
   }
-  // NOTE: `models` is intentionally NOT written here — the sidebar remembers the
-  // last-used model per provider, and overwriting it from Settings would undo that.
-  await setSettings({
+  return {
     keys, baseUrls, localEnabled,
     imageProvider: $("imageProvider").value,
     imageModel: $("imageModel").value.trim() || "gpt-image-1",
     imageSize: $("imageSize").value,
     improvePreset: $("improvePreset").value,
-    uiLang: $("uiLang").value === "fr" ? "fr" : "en",
+    uiLang: $("uiLang").value,
+    theme: curTheme,
+    themeColors: curColors,
     railSide: $("railSide").value === "right" ? "right" : "left",
     responseLang: $("responseLang").value,
     targetLang: $("targetLang").value.trim() || "French",
@@ -404,8 +530,6 @@ async function save() {
     searchModel: $("searchModel").value,
     agentModel: $("agentModel").value,
     agentPermission: $("agentPermission").value,
-    // Keep the legacy `confirmActions` flag in sync with the permission select so
-    // older code paths stay consistent (manual = confirm, auto = no confirm).
     confirmActions: $("agentPermission").value !== "auto",
     codeAppUrl: $("codeAppUrl").value.trim(),
     blockPayments: $("blockPayments").checked,
@@ -417,7 +541,22 @@ async function save() {
     compressHistory: $("compressHistory").checked,
     smartRouting: $("smartRouting").checked,
     utilityModel: $("utilityModel").value,
-  });
+  };
+}
+
+// Auto-save: persist on any change, debounced, WITHOUT the heavy rebuilds (so typing a
+// key isn't disrupted). The sidebar reacts live via its storage listener.
+let autoSaveTimer = null;
+function scheduleAutoSave() {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(async () => {
+    try { await setSettings(collectSettings()); flash($("status"), t("opt.savedAuto")); } catch (_) {}
+  }, 500);
+}
+
+// Explicit Save button: persist + refresh the model pickers + confirm.
+async function save() {
+  await setSettings(collectSettings());
   settings = await getSettings();
   modelLists = { ...(settings.modelLists || {}) };
   buildProviderFields();
@@ -462,7 +601,21 @@ async function connectAccount(id) {
   flash(status, t("opt.dyn.identify", { label: meta.label }));
 }
 
-$("save").addEventListener("click", save);
+// Switching the interface language: persist everything, then reload so the WHOLE page
+// (static markup, jump-nav pins and dynamic dropdowns) is rebuilt in the new language.
+$("uiLang").addEventListener("change", async () => {
+  try { await setSettings(collectSettings()); } catch (_) {}
+  location.reload();
+});
+// Auto-save: persist on any control change (debounced) so the user never has to click
+// a Save button (it has been removed — saving is automatic now).
+document.addEventListener("change", scheduleAutoSave);
+document.addEventListener("input", (e) => {
+  if (e.target && e.target.matches &&
+      e.target.matches('input[type="color"],input[type="text"],input[type="password"],input[type="number"],textarea')) {
+    scheduleAutoSave();
+  }
+});
 $("quickConnect").addEventListener("click", async () => {
   flash($("quickStatus"), t("opt.dyn.connecting"));
   await connectAccount("openrouter");
