@@ -60,7 +60,7 @@ de Firefox ne permet pas. Un équivalent libre n'existait pas.
   panier mais **ne peut jamais payer/commander**. Un **modèle d'agent** dédié est
   réglable (beaucoup de modèles rapides/gratuits ne savent pas appeler d'outils).
 - 🛠 **Espace Code — atelier d'app IA** : ouvre, dans un **nouvel onglet isolé**, un
-  builder d'apps web & mobiles (type **Bolt.diy** / Behivey) avec **génération de
+  builder d'apps web & mobiles (type **Bolt.diy** / Program Generator) avec **génération de
   code par l'IA**, **aperçu live**, **terminal intégré** et **QR code Expo Go** pour
   tester sur mobile. L'URL de l'atelier est **configurable** dans les réglages (votre
   instance auto-hébergée ou l'instance publique). *Pourquoi un onglet et pas une
@@ -230,7 +230,7 @@ bouton **Ouvrir** (plein écran) :
 - [x] Espaces dédiés via barre d'activité : Chat / Agent / Traduire / Améliorer / Image / PDF / Code
 - [x] Actions rapides + clic droit (page & sélection) + rédaction de réponse
 - [x] Espace agent avec autorisations réglables (manuel / auto) + garde-fou anti-achat
-- [x] Espace Code : atelier d'app IA (Bolt.diy / Behivey) en nouvel onglet (preview, Expo Go)
+- [x] Espace Code : atelier d'app IA (Bolt.diy / Program Generator) en nouvel onglet (preview, Expo Go)
 - [x] Thinking / raisonnement
 - [x] Interface moderne (sombre + dégradé), sélecteur unifié, boutons à bascule
 - [x] Connexion par compte (OAuth OpenRouter)

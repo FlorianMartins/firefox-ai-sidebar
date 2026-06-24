@@ -1216,7 +1216,7 @@ function setMode(next) {
 }
 
 // ----- Code workspace (AI app builder launcher) -----------------------------
-// The builder (Bolt.diy / Behivey) runs WebContainers, which require cross-origin
+// The builder (Bolt.diy / Program Generator) runs WebContainers, which require cross-origin
 // isolation (COOP/COEP) and therefore cannot live inside an extension iframe — we
 // open it in a dedicated browser tab where preview / terminal / Expo Go all work.
 function updateCodeLauncher() {
