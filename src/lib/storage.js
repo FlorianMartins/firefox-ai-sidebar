@@ -19,7 +19,7 @@ const DEFAULTS = {
   // ----- Image generation ---------------------------------------------------
   imageProvider: "openai",
   imageModel: "gpt-image-1",
-  imageSize: "1024x1024",
+  imageSize: "", // "" = "—": no fixed size; the model uses the dimensions described in the prompt
 
   // ----- UI / behaviour ------------------------------------------------------
   mode: "chat", // active workspace tab: chat | agent | translate | improve | image | terminal | code
@@ -71,15 +71,27 @@ const DEFAULTS = {
   compareModel: "", // "providerId|modelId" of the second model
   saveHistory: true, // persist conversations locally (privacy: local only)
 
+  // ----- Efficiency: speed + token-cost optimisation -------------------------
+  // These trim what we send to the model so the user pays only for the tokens that
+  // matter, which also lowers latency (a smaller prompt = a faster first token).
+  cleanContext: true, // strip boilerplate/whitespace/duplicate lines from page & tab
+                      // text before sending, AND send a page's content only ONCE per
+                      // conversation (not re-attached on every follow-up message).
+  compressHistory: true, // when a conversation grows long, summarise its OLD turns with
+                         // a cheap model so later turns send far fewer tokens. The UI
+                         // still shows the full transcript — only the model payload shrinks.
+  smartRouting: true, // route housekeeping work (summaries, compaction, auto-titles) to a
+                      // cheap/free model; the premium model the user picked is reserved for
+                      // the actual answers / complex reasoning.
+  utilityModel: "", // "providerId|modelId" used for the cheap housekeeping tasks above.
+                    // "" = auto-pick the cheapest free model among connected providers.
+
   // ----- Safety guardrails ---------------------------------------------------
   // The agent can browse autonomously but must never transact. When enabled it
   // refuses payment / checkout / purchase / order-confirmation actions and stops
   // at the cart, as requested. This is enforced both in the system prompt AND in
   // code (tools.js) so a jailbroken prompt cannot bypass it.
   blockPayments: true,
-  // Webmail compose helper: inject an "AI reply" button on known webmail sites.
-  // The button only DRAFTS a reply for the user to review — it never auto-sends.
-  webmailAssist: true,
 };
 
 // Migrate from the older schema (anthropicKey / openrouterKey / *Model).

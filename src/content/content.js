@@ -1,6 +1,6 @@
 // Content script: reads the page and performs the DOM actions requested by the
 // agent. Injected on every page (document_idle) and re-injected on demand by
-// tools.js. Also adds an opt-in "AI reply" helper button on known webmail sites.
+// tools.js. Also powers the page element picker and region screenshot capture.
 (function () {
   if (window.__aiSidebarInjected) return;
   window.__aiSidebarInjected = true;
@@ -264,6 +264,61 @@
     });
   }
 
+  // --- Region capture (screenshot tool) -----------------------------------
+  // Lets the user draw a free rectangle over the page (like a screenshot selection);
+  // we return the rect so the sidebar can crop the visible-tab screenshot and attach
+  // that IMAGE to the context. Esc or right-click cancels.
+  let regResolve = null, regBox = null, regStart = null, regDragging = false;
+  function regRect(e) {
+    const left = Math.min(e.clientX, regStart.x), top = Math.min(e.clientY, regStart.y);
+    return { x: left, y: top, w: Math.abs(e.clientX - regStart.x), h: Math.abs(e.clientY - regStart.y) };
+  }
+  function regDown(e) {
+    if (e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    regDragging = true; regStart = { x: e.clientX, y: e.clientY };
+    placeBox(regBox, { left: e.clientX, top: e.clientY, width: 0, height: 0 });
+  }
+  function regMove(e) {
+    if (!regDragging || !regStart) return;
+    const r = regRect(e);
+    placeBox(regBox, { left: r.x, top: r.y, width: r.w, height: r.h });
+  }
+  function regUp(e) {
+    if (!regDragging) return;
+    e.preventDefault(); e.stopPropagation();
+    endRegion(false, regRect(e));
+  }
+  function regSwallow(e) { e.preventDefault(); e.stopPropagation(); }
+  function regKey(e) { if (e.key === "Escape") { e.preventDefault(); endRegion(true); } }
+  function endRegion(cancelled, rect) {
+    document.removeEventListener("mousedown", regDown, true);
+    document.removeEventListener("mousemove", regMove, true);
+    document.removeEventListener("mouseup", regUp, true);
+    document.removeEventListener("click", regSwallow, true);
+    document.removeEventListener("keydown", regKey, true);
+    document.documentElement.style.cursor = "";
+    if (regBox) { regBox.remove(); regBox = null; }
+    regDragging = false; regStart = null;
+    const r = regResolve; regResolve = null;
+    if (!r) return;
+    if (cancelled || !rect || rect.w < 5 || rect.h < 5) { r({ cancelled: true }); return; }
+    r({ rect, dpr: window.devicePixelRatio || 1, url: location.href, title: document.title });
+  }
+  function startRegion() {
+    if (regResolve) endRegion(true);
+    return new Promise((resolve) => {
+      regResolve = resolve; regDragging = false; regStart = null;
+      regBox = mkBox("#a855f7", "rgba(168,85,247,.14)", 2147483647);
+      document.documentElement.style.cursor = "crosshair";
+      document.addEventListener("mousedown", regDown, true);
+      document.addEventListener("mousemove", regMove, true);
+      document.addEventListener("mouseup", regUp, true);
+      document.addEventListener("click", regSwallow, true);
+      document.addEventListener("keydown", regKey, true);
+    });
+  }
+
   browser.runtime.onMessage.addListener((msg) => {
     switch (msg && msg.type) {
       case "read_page":
@@ -274,6 +329,11 @@
         return startPick();
       case "pick_cancel":
         if (pickResolve) endPick(true);
+        return Promise.resolve({ ok: true });
+      case "capture_region":
+        return startRegion();
+      case "region_cancel":
+        if (regResolve) endRegion(true);
         return Promise.resolve({ ok: true });
       case "find_elements":
         return Promise.resolve(findElements(msg.query));
@@ -311,121 +371,4 @@
   }
   window.addEventListener("popstate", () => setTimeout(notifyNav, 50));
 
-  // --- Webmail "AI reply" helper -------------------------------------------
-  // On known webmail hosts, add a small floating button that grabs the visible
-  // email thread and asks the sidebar to draft a reply. It NEVER sends anything:
-  // the user reviews the draft in the sidebar and copies it back. Opt-out via the
-  // `webmailAssist` setting.
-  const WEBMAIL_HOSTS = [
-    "mail.google.com", "outlook.live.com", "outlook.office.com",
-    "outlook.office365.com", "mail.proton.me", "mail.yahoo.com",
-  ];
-  function isWebmail() {
-    return WEBMAIL_HOSTS.some((h) => location.hostname.endsWith(h));
-  }
-
-  function readThread() {
-    // Grab the largest readable region as the conversation text. Good enough
-    // across webmails without brittle per-provider selectors.
-    const main = document.querySelector("[role=main], main") || document.body;
-    return (main.innerText || "").replace(/\n{3,}/g, "\n\n").slice(0, 12000);
-  }
-
-  // Webmail button labels — English by default, French when uiLang="fr".
-  const WEBMAIL_I18N = {
-    en: { reply: "✨ Reply with AI", aria: "Draft an AI-assisted reply", opening: "✓ Opening the sidebar…" },
-    fr: { reply: "✨ Répondre avec l'IA", aria: "Rédiger une réponse assistée par IA", opening: "✓ Ouvre la sidebar…" },
-  };
-  let WM = WEBMAIL_I18N.en;
-
-  const IS_GMAIL = location.hostname.endsWith("mail.google.com");
-  function onReplyClick(btn) {
-    const thread = readThread();
-    browser.runtime.sendMessage({ type: "draft_reply", thread, url: location.href });
-    const prev = btn.textContent;
-    btn.textContent = WM.opening;
-    setTimeout(() => (btn.textContent = prev), 2500);
-  }
-
-  // Floating fallback button (used on non-Gmail webmails, or if the inline slot
-  // can't be found on Gmail).
-  function injectWebmailButton() {
-    if (document.getElementById("__ai_reply_fab")) return;
-    const btn = document.createElement("button");
-    btn.id = "__ai_reply_fab";
-    btn.type = "button";
-    btn.textContent = WM.reply;
-    btn.setAttribute("aria-label", WM.aria);
-    Object.assign(btn.style, {
-      position: "fixed", right: "18px", bottom: "18px", zIndex: 2147483647,
-      padding: "10px 14px", borderRadius: "999px", border: "0",
-      background: "linear-gradient(135deg,#6366f1 0%,#8b5cf6 55%,#a855f7 100%)",
-      color: "#fff", font: "600 13px system-ui, sans-serif",
-      boxShadow: "0 4px 14px rgba(124,58,237,.35)", cursor: "pointer",
-    });
-    btn.addEventListener("click", () => onReplyClick(btn));
-    document.documentElement.appendChild(btn);
-  }
-
-  // Gmail: place the button INLINE in the bottom action row of an open email, right
-  // after Reply / Forward / the emoji-reaction buttons (instead of a corner FAB).
-  function findGmailActionRow() {
-    const wants = ["reply", "reply all", "forward", "répondre", "repondre", "répondre à tous", "transférer", "transferer"];
-    for (const b of document.querySelectorAll('[role="button"]')) {
-      const label = ((b.innerText || "") + " " + (b.getAttribute("aria-label") || "") + " " + (b.getAttribute("data-tooltip") || "")).trim().toLowerCase();
-      if (!label) continue;
-      if (wants.some((w) => label === w || label.startsWith(w))) {
-        const row = b.parentElement;
-        // Sanity: the bottom action row groups several buttons together.
-        if (row && row.querySelectorAll('[role="button"]').length >= 2 && row.offsetParent) return row;
-      }
-    }
-    return null;
-  }
-  function injectGmailInline() {
-    const existing = document.getElementById("__ai_reply_inline");
-    if (existing && document.body.contains(existing) && existing.offsetParent) return true;
-    const row = findGmailActionRow();
-    if (!row) return false;
-    const btn = document.createElement("button");
-    btn.id = "__ai_reply_inline";
-    btn.type = "button";
-    btn.textContent = WM.reply;
-    btn.setAttribute("aria-label", WM.aria);
-    Object.assign(btn.style, {
-      marginLeft: "8px", padding: "8px 14px", borderRadius: "18px", border: "0",
-      background: "linear-gradient(135deg,#6366f1,#8b5cf6 55%,#a855f7)", color: "#fff",
-      font: "500 14px 'Google Sans', Roboto, system-ui, sans-serif", cursor: "pointer",
-      verticalAlign: "middle", lineHeight: "1",
-    });
-    btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); onReplyClick(btn); });
-    row.appendChild(btn);
-    const fab = document.getElementById("__ai_reply_fab"); // drop the corner fallback
-    if (fab) fab.remove();
-    return true;
-  }
-  let gmailObserver = null;
-  function setupGmail() {
-    injectGmailInline();
-    if (gmailObserver) return;
-    gmailObserver = new MutationObserver(() => {
-      clearTimeout(gmailObserver._t);
-      gmailObserver._t = setTimeout(injectGmailInline, 350);
-    });
-    gmailObserver.observe(document.body, { childList: true, subtree: true });
-    // If we never find the inline slot, fall back to the corner button.
-    setTimeout(() => { if (!document.getElementById("__ai_reply_inline")) injectWebmailButton(); }, 4000);
-  }
-
-  function maybeSetupWebmail() {
-    if (!isWebmail()) return;
-    const go = (s) => {
-      if (s && s.webmailAssist === false) return;
-      WM = WEBMAIL_I18N[(s && s.uiLang) === "fr" ? "fr" : "en"];
-      if (IS_GMAIL) setupGmail();
-      else injectWebmailButton();
-    };
-    try { browser.storage.local.get(["webmailAssist", "uiLang"]).then(go); } catch (_) { go({}); }
-  }
-  maybeSetupWebmail();
 })();

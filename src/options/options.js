@@ -167,13 +167,9 @@ function buildCard(id) {
     sec.appendChild(lab);
   }
 
-  // Default model — dropdown of currently available models.
-  const lab = el("label", null, t("opt.model.default"));
-  const sel = el("select");
-  sel.id = `model_${id}`;
-  lab.appendChild(sel);
-  sec.appendChild(lab);
-  fillModelSelect(sel, id);
+  // No per-provider "default model" here: the model is chosen in the sidebar's own
+  // picker and the LAST-USED one is remembered automatically (per provider). Forcing a
+  // default here would override that, so it has been removed on purpose.
 
   return sec;
 }
@@ -205,7 +201,8 @@ function fillSelect(sel, items, value) {
 function buildImageProvider() {
   const imgProviders = PROVIDER_ORDER.filter((id) => PROVIDERS[id].supportsImages).map((id) => [id, PROVIDERS[id].label]);
   fillSelect($("imageProvider"), imgProviders, settings.imageProvider || "openai");
-  fillSelect($("imageSize"), IMAGE_SIZES, settings.imageSize || "1024x1024");
+  // "—" (empty) = no fixed size; the model uses the dimensions described in the prompt.
+  fillSelect($("imageSize"), [["", t("size.none")], ...IMAGE_SIZES], settings.imageSize || "");
 }
 
 // Agent-model picker: "Auto" + the catalogue models of every CONNECTED provider.
@@ -260,6 +257,32 @@ function buildSearchModelSelect() {
   sel.value = settings.searchModel || "";
 }
 
+// Utility (housekeeping) model picker: "Auto" + the catalogue models of every
+// CONNECTED provider. Used for summaries / history compaction when smart routing
+// is on, so the premium model is reserved for the actual answers.
+function buildUtilityModelSelect() {
+  const sel = $("utilityModel");
+  if (!sel) return;
+  sel.innerHTML = "";
+  const auto = el("option", null, t("opt.eff.utilityAuto"));
+  auto.value = "";
+  sel.appendChild(auto);
+  for (const id of PROVIDER_ORDER) {
+    if (!isConnected(id, settings)) continue;
+    const meta = PROVIDERS[id];
+    if (!meta.models || !meta.models.length) continue;
+    const group = document.createElement("optgroup");
+    group.label = meta.label;
+    for (const [mid, mlabel] of meta.models) {
+      const o = el("option", null, mlabel);
+      o.value = id + "|" + mid;
+      group.appendChild(o);
+    }
+    sel.appendChild(group);
+  }
+  sel.value = settings.utilityModel || "";
+}
+
 // Fetch live model lists for connected providers, then refresh the dropdowns.
 async function refreshModelLists() {
   const ids = PROVIDER_ORDER.filter((id) => isConnected(id, settings));
@@ -271,10 +294,6 @@ async function refreshModelLists() {
       } catch (_) {}
     })
   );
-  for (const id of ids) {
-    const sel = $(`model_${id}`);
-    if (sel) fillModelSelect(sel, id);
-  }
   await setSettings({ modelLists: { ...(settings.modelLists || {}), ...modelLists } });
 }
 
@@ -333,6 +352,7 @@ async function load() {
   buildImageProvider();
   buildSearchModelSelect();
   buildAgentModelSelect();
+  buildUtilityModelSelect();
   fillSelect($("responseLang"), [["Auto", t("opt.lang.respAuto")], ...LANGUAGES.map((l) => [l, l])], settings.responseLang || "Auto");
   fillSelect($("improvePreset"), WRITING_PRESETS.map((p) => [p[0], t("preset." + p[0])]), settings.improvePreset || "improve");
   updateQuickConnect(isConnected("openrouter", settings));
@@ -345,31 +365,32 @@ async function load() {
   $("agentPermission").value = settings.agentPermission || "manual";
   $("codeAppUrl").value = settings.codeAppUrl != null ? settings.codeAppUrl : "";
   $("blockPayments").checked = settings.blockPayments;
-  $("webmailAssist").checked = settings.webmailAssist;
   $("saveHistory").checked = settings.saveHistory;
   $("includePageContext").checked = settings.includePageContext;
   $("autoReadPage").checked = settings.autoReadPage;
   $("maxPageChars").value = settings.maxPageChars;
+  $("cleanContext").checked = settings.cleanContext !== false;
+  $("compressHistory").checked = settings.compressHistory !== false;
+  $("smartRouting").checked = settings.smartRouting !== false;
   refreshModelLists();
 }
 
 async function save() {
   const keys = {};
   const baseUrls = {};
-  const models = {};
   const localEnabled = {};
   for (const id of PROVIDER_ORDER) {
     const k = $(`key_${id}`);
     if (k && k.value.trim()) keys[id] = k.value.trim();
     const u = $(`url_${id}`);
     if (u && u.value.trim()) baseUrls[id] = u.value.trim();
-    const m = $(`model_${id}`);
-    if (m && m.value) models[id] = m.value;
     const lc = $(`local_${id}`);
     if (lc && lc.checked) localEnabled[id] = true;
   }
+  // NOTE: `models` is intentionally NOT written here — the sidebar remembers the
+  // last-used model per provider, and overwriting it from Settings would undo that.
   await setSettings({
-    keys, baseUrls, models, localEnabled,
+    keys, baseUrls, localEnabled,
     imageProvider: $("imageProvider").value,
     imageModel: $("imageModel").value.trim() || "gpt-image-1",
     imageSize: $("imageSize").value,
@@ -388,17 +409,21 @@ async function save() {
     confirmActions: $("agentPermission").value !== "auto",
     codeAppUrl: $("codeAppUrl").value.trim(),
     blockPayments: $("blockPayments").checked,
-    webmailAssist: $("webmailAssist").checked,
     saveHistory: $("saveHistory").checked,
     includePageContext: $("includePageContext").checked,
     autoReadPage: $("autoReadPage").checked,
     maxPageChars: parseInt($("maxPageChars").value, 10) || 12000,
+    cleanContext: $("cleanContext").checked,
+    compressHistory: $("compressHistory").checked,
+    smartRouting: $("smartRouting").checked,
+    utilityModel: $("utilityModel").value,
   });
   settings = await getSettings();
   modelLists = { ...(settings.modelLists || {}) };
   buildProviderFields();
   buildSearchModelSelect();
   buildAgentModelSelect();
+  buildUtilityModelSelect();
   refreshModelLists();
   flash($("status"), t("opt.saved"));
 }

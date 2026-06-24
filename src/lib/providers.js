@@ -202,8 +202,13 @@ function openaiProvider({ apiKey, model, baseUrl, webSearch, providerId, thinkin
       // 💭 block. DeepSeek's reasoner models stream `reasoning_content` on their own.
       // We only send the param to OpenRouter; other strict APIs would reject an unknown
       // field, and models that don't reason simply ignore the toggle.
-      if (thinking && providerId === "openrouter") {
-        body.reasoning = { effort: "medium" };
+      //
+      // IMPORTANT for speed/cost: many default models (gpt-oss, Nemotron, Qwen-thinking…)
+      // REASON BY DEFAULT, which is slow and burns tokens. So when the Thinking toggle is
+      // OFF we explicitly DISABLE reasoning for a fast, cheap, near-instant answer — and
+      // only enable it when the user actually asks for it.
+      if (providerId === "openrouter") {
+        body.reasoning = thinking ? { effort: "medium" } : { enabled: false };
       }
       if (tools && tools.length) {
         body.tools = tools.map((t) => ({
@@ -397,7 +402,9 @@ export async function transcribeAudio(settings, blob) {
 // -------- Image generation (OpenAI-compatible /images/generations) ----------
 // Returns a list of data: (or http) URLs to display.
 export async function generateImage(settings, { prompt, size, signal }) {
-  size = size || settings.imageSize || "1024x1024";
+  // size === "" (or unset) means: no fixed size — let the model use the dimensions
+  // described in the prompt (and providers fall back to their own default).
+  size = size != null ? size : (settings.imageSize || "");
   const providerId = settings.imageProvider || "openai";
   const meta = PROVIDERS[providerId];
   if (!meta || !meta.supportsImages) {
@@ -421,8 +428,8 @@ export async function generateImage(settings, { prompt, size, signal }) {
     model: settings.imageModel || (meta.imageModels && meta.imageModels[0][0]),
     prompt,
     n: 1,
-    size,
   };
+  if (size) body.size = size; // omit when "—" (custom): the provider uses its default
   const headers = { "content-type": "application/json" };
   if (apiKey) headers.authorization = `Bearer ${apiKey}`;
 

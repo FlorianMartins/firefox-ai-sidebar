@@ -34,6 +34,14 @@ const els = {
   attachBtn: $("attachBtn"),
   attachInput: $("attachInput"),
   attachStrip: $("attachStrip"),
+  dropOverlay: $("dropOverlay"),
+  searchBtn: $("searchBtn"),
+  searchBar: $("searchBar"),
+  searchInput: $("searchInput"),
+  searchCount: $("searchCount"),
+  searchPrev: $("searchPrev"),
+  searchNext: $("searchNext"),
+  searchClose: $("searchClose"),
   modelFilterBtn: $("modelFilterBtn"),
   modelFilterPanel: $("modelFilterPanel"),
   filterProviders: $("filterProviders"),
@@ -47,10 +55,12 @@ const els = {
   historyPanel: $("historyPanel"),
   historyList: $("historyList"),
   clearHistory: $("clearHistory"),
+  deleteSelected: $("deleteSelected"),
   closeHistory: $("closeHistory"),
   pageBar: $("pageBar"),
   pageTitle: $("pageTitle"),
   pickEl: $("pickEl"),
+  captureRegion: $("captureRegion"),
   tabsBtn: $("tabsBtn"),
   tabsPanel: $("tabsPanel"),
   tabsList: $("tabsList"),
@@ -138,7 +148,7 @@ let filterPersistTimer = null;
 const CHAT_MODES = ["chat", "agent", "translate", "improve", "image", "pdf"];
 const sessions = {}; // mode -> { history, transcript, convId, lastUserContent, lastRunMode, lastForceWeb }
 function blankSession(m) {
-  return { history: [], transcript: [], convId: newConversationId(), lastUserContent: "", lastRunMode: m, lastForceWeb: false, nodes: null };
+  return { history: [], transcript: [], convId: newConversationId(), lastUserContent: "", lastRunMode: m, lastForceWeb: false, nodes: null, pageCtxKeys: new Set(), customTitle: "", importedSources: [] };
 }
 // Visual persistence per tab: instead of re-deriving the DOM from `transcript`
 // (which can drop streamed/enhanced content and the compare bars), we DETACH the
@@ -202,7 +212,7 @@ async function init() {
   els.translateLang.value = settings.targetLang || "French";
   els.improvePreset.value = settings.improvePreset || "improve";
   populateImageSizes();
-  els.imageSize.value = settings.imageSize || "1024x1024";
+  els.imageSize.value = settings.imageSize || ""; // "" = "—" (custom / size in prompt)
   syncToggleVisibility();
   updateImageNote();
   wire();
@@ -555,6 +565,12 @@ function populateImprovePresets() {
 }
 function populateImageSizes() {
   els.imageSize.innerHTML = "";
+  // "—" (empty value): no fixed size — let the model use the dimensions described in
+  // the prompt. Selected by default so users can ask for custom sizes freely.
+  const none = document.createElement("option");
+  none.value = "";
+  none.textContent = t("size.none");
+  els.imageSize.appendChild(none);
   for (const [value] of IMAGE_SIZES) {
     const o = document.createElement("option");
     o.value = value;
@@ -996,6 +1012,19 @@ async function getActiveTabId() {
     return tabs && tabs[0] ? tabs[0].id : null;
   } catch (_) { return null; }
 }
+// Send a message to the tab's content script; if it isn't there yet (page opened
+// before the extension loaded), inject it on demand and retry. Throws if it still
+// can't be reached.
+async function sendToTab(tabId, msg) {
+  try {
+    return await browser.tabs.sendMessage(tabId, msg);
+  } catch (e) {
+    try {
+      await browser.scripting.executeScript({ target: { tabId }, files: ["vendor/browser-polyfill.min.js", "src/content/content.js"] });
+      return await browser.tabs.sendMessage(tabId, msg);
+    } catch (_) { throw e; }
+  }
+}
 function loadImage(src) {
   return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
 }
@@ -1016,7 +1045,7 @@ function cancelPicking() {
   if (id != null) { try { browser.tabs.sendMessage(id, { type: "pick_cancel" }); } catch (_) {} }
 }
 async function pickElement() {
-  if (picking) return;
+  if (picking || capturing) return;
   const tabId = await getActiveTabId();
   if (tabId == null) { addMessage("error", t("pick.error")); return; }
   if (mode !== "chat" && mode !== "agent") setMode("chat");
@@ -1024,18 +1053,24 @@ async function pickElement() {
   const note = addMessage("tool", t("pick.start"));
   let res;
   try {
-    res = await browser.tabs.sendMessage(tabId, { type: "pick_element" });
+    res = await sendToTab(tabId, { type: "pick_element" });
   } catch (_) {
     note.remove(); finishPicking();
     addMessage("error", t("pick.error"));
     return;
   }
   note.remove(); finishPicking();
+  if (res === undefined) { addMessage("error", t("region.reload")); return; } // stale content script
   const list = (res && res.elements) || [];
   if (!res || res.cancelled || !list.length) return;
   // One screenshot of the current viewport; crop each selected element from it.
   let img = null;
-  try { await new Promise((r) => setTimeout(r, 140)); img = await loadImage(await browser.tabs.captureVisibleTab(undefined, { format: "png" })); } catch (_) {}
+  try {
+    await new Promise((r) => setTimeout(r, 140));
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    const winId = tabs && tabs[0] ? tabs[0].windowId : undefined;
+    img = await loadImage(await browser.tabs.captureVisibleTab(winId, { format: "png" }));
+  } catch (_) {}
   for (const el of list) {
     if (img) { const crop = cropFromShot(img, el.rect, res.dpr || 1); if (crop) attachments.push({ type: "image", name: t("pick.imgName", { tag: el.tag }), dataUrl: crop, mediaType: "image/png" }); }
     if (el.text) attachments.push({ type: "text", name: t("pick.attName", { tag: el.tag }), text: `[Selected <${el.tag}> on ${res.title} — ${res.url}]\n${el.text}` });
@@ -1045,9 +1080,58 @@ async function pickElement() {
   els.input.focus();
 }
 
+// ----- Region capture (screenshot tool) -------------------------------------
+// "Capture an area": the user draws a rectangle over the page; we crop that region
+// from a screenshot and stage it as an IMAGE attachment (vision), so the next message
+// can ask about exactly what's on screen — like the Program Generator capture tool.
+let capturing = false;
+function finishCapture() { capturing = false; pickTabId = null; els.captureRegion.classList.remove("active"); }
+function cancelCapture() {
+  if (!capturing) return;
+  const id = pickTabId;
+  if (id != null) { try { browser.tabs.sendMessage(id, { type: "region_cancel" }); } catch (_) {} }
+}
+async function captureRegion() {
+  if (capturing || picking) return;
+  const tabId = await getActiveTabId();
+  if (tabId == null) { addMessage("error", t("pick.error")); return; }
+  if (mode !== "chat" && mode !== "agent") setMode("chat");
+  capturing = true; pickTabId = tabId; els.captureRegion.classList.add("active");
+  const note = addMessage("tool", t("region.start"));
+  let res;
+  try {
+    res = await sendToTab(tabId, { type: "capture_region" });
+  } catch (_) {
+    note.remove(); finishCapture();
+    addMessage("error", t("pick.error"));
+    return;
+  }
+  note.remove(); finishCapture();
+  // A stale content script (page loaded before this update) ignores the message and
+  // returns undefined — tell the user to refresh the page once.
+  if (res === undefined) { addMessage("error", t("region.reload")); return; }
+  if (!res || res.cancelled || !res.rect) return;
+  // Screenshot the viewport (overlay already removed), then crop the chosen rectangle.
+  let img = null, capErr = "";
+  try {
+    await new Promise((r) => setTimeout(r, 140));
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    const winId = tabs && tabs[0] ? tabs[0].windowId : undefined;
+    img = await loadImage(await browser.tabs.captureVisibleTab(winId, { format: "png" }));
+  } catch (e) { capErr = (e && e.message) || String(e); }
+  if (!img) { addMessage("error", t("region.error") + (capErr ? " — " + capErr : "")); return; }
+  const crop = cropFromShot(img, res.rect, res.dpr || 1);
+  if (!crop) { addMessage("error", t("region.error")); return; }
+  attachments.push({ type: "image", name: t("region.imgName"), dataUrl: crop, mediaType: "image/png" });
+  renderAttachStrip();
+  addMessage("tool", t("region.added"));
+  els.input.focus();
+}
+
 // ----- Workspace modes ------------------------------------------------------
 function setMode(next) {
   const prev = mode;
+  if (prev !== next && els.searchBar && !els.searchBar.classList.contains("hidden")) closeSearch();
   // Save the conversation we're leaving (data + DOM nodes), then point the globals
   // at the target workspace's own conversation.
   if (prev !== next && CHAT_MODES.includes(prev)) { syncSessionFromGlobals(prev); stashMode(prev); }
@@ -1076,6 +1160,8 @@ function setMode(next) {
   if (CHAT_MODES.includes(next)) restoreMode(next); // re-attach this tab's own message nodes
   if (next === "code") updateCodeLauncher();
   updateEmptyState();
+  // If the history panel is open, refresh it to show THIS workspace's conversations.
+  if (!els.historyPanel.classList.contains("hidden")) renderHistoryList();
 }
 
 // ----- Code workspace (AI app builder launcher) -----------------------------
@@ -1120,7 +1206,6 @@ function setupPageAwareness() {
   browser.runtime.onMessage.addListener((msg) => {
     if (!msg) return;
     if (msg.type === "page_changed") onChange();
-    else if (msg.type === "draft_reply") runQuickAction("reply", msg.thread || "");
   });
 }
 let refreshTimer = null;
@@ -1187,7 +1272,7 @@ async function selectedTabsContext() {
     try {
       const p = await executeTool("read_tab", { tabId }, {});
       if (p && !p.error && p.text) {
-        parts.push(`[Tab] ${p.title || ""} (${p.url})\n` + p.text.slice(0, Math.floor(settings.maxPageChars / 2)));
+        parts.push(`[Tab] ${p.title || ""} (${p.url})\n` + cleanText(p.text).slice(0, Math.floor(settings.maxPageChars / 2)));
       }
     } catch (_) {}
   }
@@ -1202,60 +1287,290 @@ function timeAgo(ts) {
   if (s < 86400) return t("time.hour", { n: Math.floor(s / 3600) });
   return t("time.day", { n: Math.floor(s / 86400) });
 }
+// Display title for a saved (or synthetic current) conversation entry: a manual
+// rename wins, then the auto-derived title, then the "New conversation" placeholder.
+function displayTitleFor(c) {
+  if (c.customTitle) return c.customTitle;
+  if (c.title && c.title !== "Nouvelle conversation") return c.title;
+  return t("history.newEntry");
+}
 async function renderHistoryList() {
   // Each workspace shows ONLY its own saved conversations (legacy entries with no
   // mode are treated as Chat).
   const all = await listConversations();
-  const list = all.filter((c) => (c.mode || "chat") === mode);
+  const saved = all.filter((c) => (c.mode || "chat") === mode);
+  // Always surface the conversation that is OPEN right now — even before its first
+  // message is saved — as a "New conversation · Current" entry at the top, so opening
+  // a fresh chat immediately shows up in the list (its name fills in from the prompt).
+  const entries = saved.slice();
+  if (!entries.some((c) => c.id === convId)) {
+    const s = getSession(mode);
+    entries.unshift({ id: convId, mode, updatedAt: Date.now(), customTitle: s.customTitle || "", title: "", _synthetic: true });
+  }
   els.historyList.innerHTML = "";
-  if (!list.length) {
+  if (!entries.length) {
     const li = document.createElement("li");
     li.className = "muted";
     li.textContent = t("history.empty");
     els.historyList.appendChild(li);
     return;
   }
-  for (const c of list) {
+  for (const c of entries) {
     const li = document.createElement("li");
     li.className = "histrow";
+    const isCurrent = c.id === convId;
+    if (isCurrent) li.classList.add("current");
+    // Selection checkbox (saved conversations only) for bulk delete.
+    if (!c._synthetic) {
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.className = "hsel";
+      cb.dataset.id = c.id;
+      cb.title = t("hist.selectTitle");
+      cb.addEventListener("click", (e) => e.stopPropagation());
+      cb.addEventListener("change", updateDeleteSelectedBtn);
+      li.appendChild(cb);
+    }
     const title = document.createElement("span");
     title.className = "htitle";
-    title.textContent = c.title || t("history.untitled");
+    title.textContent = displayTitleFor(c);
+    li.appendChild(title);
+    // Rename button (✏️) sits right after the title — i.e. just LEFT of the "Current"
+    // tag — at the end of the title's available width.
+    const ren = document.createElement("button");
+    ren.className = "hact hren";
+    ren.textContent = "✏️";
+    ren.title = t("hist.renameTitle");
+    ren.addEventListener("click", (e) => { e.stopPropagation(); startRename(c, li, title); });
+    li.appendChild(ren);
+    // The "Current" tag is a SEPARATE, non-shrinking element — only the title text
+    // truncates, so the tag is always shown in full.
+    if (isCurrent) {
+      const tag = document.createElement("span");
+      tag.className = "hcur";
+      tag.textContent = t("history.current");
+      li.appendChild(tag);
+    }
     const meta = document.createElement("span");
     meta.className = "hmeta";
     meta.textContent = timeAgo(c.updatedAt || Date.now());
-    const del = document.createElement("button");
-    del.className = "hdel";
-    del.textContent = "✕";
-    del.title = t("delete.title");
-    del.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      await deleteConversation(c.id);
-      // If the deleted conversation is the one open, switch to a fresh new chat.
-      if (c.id === convId) startFreshChat();
-      renderHistoryList();
-    });
-    li.addEventListener("click", () => loadConversation(c.id));
-    li.appendChild(title);
     li.appendChild(meta);
-    li.appendChild(del);
+    // Actions: share (🔗, saved only) · delete (✕, saved only).
+    if (!c._synthetic) {
+      const share = document.createElement("button");
+      share.className = "hact hshare";
+      share.textContent = "🔗";
+      share.title = t("hist.shareTitle");
+      share.addEventListener("click", (e) => { e.stopPropagation(); openSharePicker(c); });
+      const del = document.createElement("button");
+      del.className = "hdel";
+      del.textContent = "✕";
+      del.title = t("delete.title");
+      del.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await deleteConversation(c.id);
+        if (c.id === convId) startFreshChat();
+        renderHistoryList();
+      });
+      li.appendChild(share);
+      li.appendChild(del);
+    }
+    if (!isCurrent) li.addEventListener("click", () => loadConversation(c.id));
     els.historyList.appendChild(li);
+  }
+  updateDeleteSelectedBtn();
+}
+
+// Reflect the number of ticked conversations on the "Delete selected" button.
+function updateDeleteSelectedBtn() {
+  if (!els.deleteSelected) return;
+  const n = els.historyList.querySelectorAll(".hsel:checked").length;
+  els.deleteSelected.classList.toggle("hidden", n === 0);
+  els.deleteSelected.textContent = t("history.deleteSelected", { n });
+}
+// Delete every ticked conversation at once.
+async function deleteSelectedConversations() {
+  const ids = Array.from(els.historyList.querySelectorAll(".hsel:checked")).map((cb) => cb.dataset.id);
+  if (!ids.length) return;
+  for (const id of ids) await deleteConversation(id);
+  if (ids.includes(convId)) startFreshChat();
+  renderHistoryList();
+}
+
+// Inline rename: turn the title into an editable field. A manual title is persisted
+// (customTitle) and no longer overwritten by the auto title derived from the prompt.
+function startRename(c, li, titleSpan) {
+  const input = document.createElement("input");
+  input.className = "hrename";
+  input.value = displayTitleFor(c);
+  li.replaceChild(input, titleSpan);
+  input.focus(); input.select();
+  let done = false;
+  const commit = async (save) => {
+    if (done) return; done = true;
+    const v = input.value.trim();
+    if (save && v) await applyRename(c, v);
+    renderHistoryList();
+  };
+  input.addEventListener("click", (e) => e.stopPropagation());
+  input.addEventListener("keydown", (e) => {
+    e.stopPropagation();
+    if (e.key === "Enter") { e.preventDefault(); commit(true); }
+    else if (e.key === "Escape") { e.preventDefault(); commit(false); }
+  });
+  input.addEventListener("blur", () => commit(true));
+}
+async function applyRename(c, newTitle) {
+  if (c.id === convId) getSession(mode).customTitle = newTitle;
+  const conv = await getConversation(c.id);
+  if (conv) {
+    conv.customTitle = newTitle;
+    conv.title = newTitle;
+    await saveConversation(conv);
+  }
+  // An unsaved current conversation has no stored entry yet; its customTitle on the
+  // session is enough and gets persisted when the first message is saved.
+}
+
+// Compress a conversation into a context note — LOCALLY and INSTANTLY (no API call,
+// so the import is fast and spends zero tokens). We clean the text and, if it's long,
+// keep the head + tail within a budget (the start sets up the topic, the end carries
+// the latest state) so the gist survives.
+function compressConversation(conv) {
+  const items = conv.transcript || [];
+  const raw = items
+    .map((m) => `${m.role === "assistant" ? "Assistant" : m.kind === "note" ? "Note" : "User"}: ${m.text || (m.kind === "image" ? "[generated image]" : "")}`)
+    .join("\n");
+  const cleaned = cleanText(raw);
+  if (!cleaned) return "(empty conversation)";
+  const BUDGET = 4000;
+  if (cleaned.length <= BUDGET) return cleaned;
+  return cleaned.slice(0, Math.floor(BUDGET * 0.6)) + "\n…\n" + cleaned.slice(-Math.floor(BUDGET * 0.4));
+}
+
+// Share = inject one conversation's compressed context into ANOTHER conversation.
+// Shows an inline "pick a target" list inside the history panel.
+async function openSharePicker(source) {
+  const all = await listConversations();
+  const others = all.filter((c) => (c.mode || "chat") === mode && c.id !== source.id);
+  // The conversation open right now is a valid target too — even if it's a brand-new
+  // blank one not yet saved. Add it (as "New conversation") at the top.
+  if (convId !== source.id && !others.some((c) => c.id === convId)) {
+    const s = getSession(mode);
+    others.unshift({ id: convId, mode, customTitle: s.customTitle || "", title: "", _synthetic: true });
+  }
+  els.historyList.innerHTML = "";
+  const head = document.createElement("li");
+  head.className = "share-head";
+  head.textContent = t("share.pickTitle");
+  els.historyList.appendChild(head);
+  if (!others.length) {
+    const li = document.createElement("li");
+    li.className = "muted";
+    li.textContent = t("share.none");
+    els.historyList.appendChild(li);
+  } else {
+    for (const c of others) {
+      const li = document.createElement("li");
+      li.className = "histrow share-target";
+      const title = document.createElement("span");
+      title.className = "htitle";
+      title.textContent = displayTitleFor(c);
+      li.appendChild(title);
+      li.addEventListener("click", () => injectContext(source, c));
+      els.historyList.appendChild(li);
+    }
+  }
+  const cancel = document.createElement("li");
+  cancel.className = "share-cancel";
+  cancel.textContent = t("share.cancel");
+  cancel.addEventListener("click", () => renderHistoryList());
+  els.historyList.appendChild(cancel);
+}
+
+// Replace the picker with a transient confirmation line, then return to the list —
+// so the user gets clear feedback and can't click a target twice by accident.
+let sharing = false;
+function showShareLine(text, spinning) {
+  els.historyList.innerHTML = "";
+  const li = document.createElement("li");
+  li.className = "share-result" + (spinning ? " spinning" : "");
+  li.textContent = text;
+  els.historyList.appendChild(li);
+  return li;
+}
+function showShareResult(text) {
+  showShareLine(text, false);
+  setTimeout(() => { if (!els.historyPanel.classList.contains("hidden")) renderHistoryList(); }, 1500);
+}
+
+// Inject ONE conversation's compressed summary into another as background CONTEXT
+// (a primed user→assistant pair in the model history), NOT as visible chat bubbles.
+// The conversation shows a single discreet "📎 imported" note. Re-importing the same
+// source is blocked, and concurrent clicks are ignored (no accidental loops).
+async function injectContext(source, target) {
+  if (sharing) return;
+  sharing = true;
+  showShareLine(t("share.importing"), true); // immediate "something is happening" signal
+  try {
+    const src = await getConversation(source.id);
+    if (!src) { showShareResult(t("share.none")); return; }
+    const srcTitle = displayTitleFor(src);
+    const tgtTitleFor = (c) => displayTitleFor(c);
+    const summary = compressConversation(src); // local + instant
+    const modelNote = `[Imported context from a previous conversation titled "${srcTitle}"]\n${summary}\n[End of imported context]`;
+    const ack = "Understood — I'll take that imported context into account in my answers.";
+    const noteItem = { role: "note", kind: "note", text: t("share.injected", { title: srcTitle }) };
+
+    if (target.id === convId) {
+      const sess = getSession(mode);
+      if ((sess.importedSources || []).includes(source.id)) { showShareResult(t("share.already")); return; }
+      history.push({ role: "user", content: modelNote });
+      history.push({ role: "assistant", content: ack });
+      transcript.push(noteItem);
+      sess.importedSources = [...(sess.importedSources || []), source.id];
+      syncSessionFromGlobals(mode);
+      renderTranscriptItem(noteItem);
+      els.empty.classList.add("hidden");
+      await saveCurrent();
+      showShareResult(t("share.done", { title: srcTitle }));
+    } else {
+      const tgt = await getConversation(target.id);
+      if (!tgt) { showShareResult(t("share.none")); return; }
+      tgt.importedSources = tgt.importedSources || [];
+      if (tgt.importedSources.includes(source.id)) { showShareResult(t("share.already")); return; }
+      tgt.nativeHistory = tgt.nativeHistory || [];
+      tgt.transcript = tgt.transcript || [];
+      tgt.nativeHistory.push({ role: "user", content: modelNote });
+      tgt.nativeHistory.push({ role: "assistant", content: ack });
+      tgt.transcript.push(noteItem);
+      tgt.importedSources.push(source.id);
+      await saveConversation(tgt);
+      showShareResult(t("share.addedTo", { title: tgtTitleFor(tgt) }));
+    }
+  } finally {
+    sharing = false;
   }
 }
 // Persist a SPECIFIC session (bound to its own convId/mode) so an answer that
 // finishes after the user has switched tabs is still saved to the right place.
 async function saveSession(sess, m, sel) {
   if (!settings.saveHistory || !sess.transcript.length) return;
+  // A manual rename (customTitle) is sticky; otherwise derive the title from the prompt.
+  const title = sess.customTitle || titleFrom(sess.transcript);
   await saveConversation({
-    id: sess.convId, title: titleFrom(sess.transcript), updatedAt: Date.now(), mode: m,
+    id: sess.convId, title, customTitle: sess.customTitle || "", updatedAt: Date.now(), mode: m,
     providerId: sel.providerId, model: sel.modelId, transcript: sess.transcript, nativeHistory: sess.history,
+    importedSources: sess.importedSources || [],
   });
 }
 async function saveCurrent() {
   return saveSession(getSession(mode), mode, currentSelection());
 }
 function renderTranscriptItem(item) {
-  if (item.role === "user") {
+  if (item.kind === "note") {
+    return addMessage("tool", item.text); // discreet system note (e.g. imported context)
+  } else if (item.role === "user") {
     const d = addMessage("user", item.text);
     if (item.atts) renderUserAttachments(d, item.atts);
     return d;
@@ -1287,6 +1602,9 @@ async function loadConversation(id) {
   history = c.nativeHistory || [];
   convId = c.id;
   lastUserContent = ""; // a loaded conversation has no pending "compare" target
+  getSession(mode).pageCtxKeys = new Set(); // re-attach page context once for this thread
+  getSession(mode).customTitle = c.customTitle || ""; // keep a manual rename
+  getSession(mode).importedSources = c.importedSources || []; // keep dedup of imports
   syncSessionFromGlobals(mode); // these new arrays become this tab's live session
   for (const item of transcript) renderTranscriptItem(item);
   els.empty.classList.add("hidden");
@@ -1301,6 +1619,9 @@ function startFreshChat() {
   transcript = [];
   convId = newConversationId();
   lastUserContent = "";
+  getSession(mode).pageCtxKeys = new Set();
+  getSession(mode).customTitle = "";
+  getSession(mode).importedSources = [];
   syncSessionFromGlobals(mode); // the fresh arrays are this tab's live session
   clearMessages();
   els.empty.classList.remove("hidden");
@@ -1309,6 +1630,88 @@ function startFreshChat() {
 async function newChat() {
   await saveCurrent();
   startFreshChat();
+  // If the history panel is open, show the fresh conversation right away (it appears
+  // as "New conversation · Current" until the first prompt names it).
+  if (!els.historyPanel.classList.contains("hidden")) renderHistoryList();
+}
+
+// ----- In-conversation search -----------------------------------------------
+// Find terms in the current conversation's messages and jump between matches,
+// instead of re-prompting. Matches are wrapped in <mark> and navigated with
+// prev/next (or Enter / Shift+Enter). Highlights are stripped on close.
+let searchHits = [];
+let searchIdx = -1;
+function clearSearchHighlights() {
+  els.messages.querySelectorAll("mark.search-hit").forEach((m) => m.replaceWith(document.createTextNode(m.textContent)));
+  els.messages.normalize();
+  searchHits = []; searchIdx = -1;
+}
+function wrapMatches(textNode, needle) {
+  const text = textNode.nodeValue, lower = text.toLowerCase();
+  let idx = lower.indexOf(needle);
+  if (idx < 0) return;
+  const frag = document.createDocumentFragment();
+  let last = 0;
+  while (idx >= 0) {
+    if (idx > last) frag.appendChild(document.createTextNode(text.slice(last, idx)));
+    const mark = document.createElement("mark");
+    mark.className = "search-hit";
+    mark.textContent = text.slice(idx, idx + needle.length);
+    frag.appendChild(mark);
+    last = idx + needle.length;
+    idx = lower.indexOf(needle, last);
+  }
+  if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+  textNode.parentNode.replaceChild(frag, textNode);
+}
+function highlightIn(root, needle) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(n) {
+      if (!n.nodeValue || !n.nodeValue.toLowerCase().includes(needle)) return NodeFilter.FILTER_REJECT;
+      if (n.parentNode && n.parentNode.nodeName === "MARK") return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+  const targets = [];
+  let n; while ((n = walker.nextNode())) targets.push(n);
+  for (const node of targets) wrapMatches(node, needle);
+}
+function focusHit() {
+  searchHits.forEach((m, i) => m.classList.toggle("current", i === searchIdx));
+  const cur = searchHits[searchIdx];
+  if (cur) cur.scrollIntoView({ block: "center", behavior: "smooth" });
+}
+function updateSearchCount() {
+  if (searchHits.length) els.searchCount.textContent = t("search.count", { i: searchIdx + 1, n: searchHits.length });
+  else els.searchCount.textContent = els.searchInput.value.trim() ? t("search.none") : "";
+}
+function runSearch(q) {
+  clearSearchHighlights();
+  const needle = (q || "").trim().toLowerCase();
+  if (needle) els.messages.querySelectorAll(".msg").forEach((msg) => highlightIn(msg, needle));
+  searchHits = Array.from(els.messages.querySelectorAll("mark.search-hit"));
+  searchIdx = searchHits.length ? 0 : -1;
+  focusHit();
+  updateSearchCount();
+}
+function gotoHit(delta) {
+  if (!searchHits.length) return;
+  searchIdx = (searchIdx + delta + searchHits.length) % searchHits.length;
+  focusHit();
+  updateSearchCount();
+}
+function openSearch() {
+  els.searchBar.classList.remove("hidden");
+  els.searchInput.focus(); els.searchInput.select();
+  if (els.searchInput.value.trim()) runSearch(els.searchInput.value);
+}
+function closeSearch() {
+  els.searchBar.classList.add("hidden");
+  clearSearchHighlights();
+  updateSearchCount();
+}
+function toggleSearch() {
+  if (els.searchBar.classList.contains("hidden")) openSearch(); else closeSearch();
 }
 
 // ----- Pending actions ------------------------------------------------------
@@ -1332,9 +1735,10 @@ function wire() {
   document.addEventListener("mousedown", (e) => {
     if (mainCombo.isOpen() && e.target !== els.modelInput && !els.modelMenu.contains(e.target)) mainCombo.close();
     if (picking && !els.pickEl.contains(e.target)) cancelPicking();
+    if (capturing && !els.captureRegion.contains(e.target)) cancelCapture();
   });
-  // Esc cancels element-pick mode even when focus is in the sidebar.
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && picking) cancelPicking(); });
+  // Esc cancels element-pick / region-capture mode even when focus is in the sidebar.
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { if (picking) cancelPicking(); if (capturing) cancelCapture(); } });
 
   // Open the sidebar as a full-screen browser tab (hidden when already in a tab).
   if (IS_TAB) els.expandTab.hidden = true;
@@ -1349,6 +1753,25 @@ function wire() {
   els.attachInput.addEventListener("change", async (e) => {
     await addAttachmentFiles(e.target.files);
     e.target.value = ""; // allow re-selecting the same file
+  });
+
+  // Drag & drop files anywhere on the sidebar to attach them (in addition to +).
+  let dragDepth = 0;
+  const hasFiles = (e) => !!e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files");
+  const showDrop = (on) => els.dropOverlay.classList.toggle("hidden", !on);
+  window.addEventListener("dragenter", (e) => { if (!hasFiles(e)) return; e.preventDefault(); dragDepth++; showDrop(true); });
+  window.addEventListener("dragover", (e) => { if (!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
+  window.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; showDrop(false); } });
+  window.addEventListener("drop", async (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); dragDepth = 0; showDrop(false);
+    const files = e.dataTransfer.files;
+    if (!files || !files.length) return;
+    if (mode === "code") setMode("chat");          // Code/Image have no attachment context
+    if (mode === "pdf" && files[0] && /\.pdf$/i.test(files[0].name)) { loadPdfFile(files[0]); return; }
+    if (mode === "image") setMode("chat");
+    await addAttachmentFiles(files);
+    els.input.focus();
   });
 
   // Model filter popover (price tiers + providers / OpenRouter sub-vendors).
@@ -1402,11 +1825,23 @@ function wire() {
     await setSettings({ imageSize: settings.imageSize });
   });
 
+  // In-conversation search (🔍 in the top bar).
+  els.searchBtn.addEventListener("click", toggleSearch);
+  els.searchInput.addEventListener("input", () => runSearch(els.searchInput.value));
+  els.searchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); gotoHit(e.shiftKey ? -1 : 1); }
+    else if (e.key === "Escape") { e.preventDefault(); closeSearch(); }
+  });
+  els.searchPrev.addEventListener("click", () => gotoHit(-1));
+  els.searchNext.addEventListener("click", () => gotoHit(1));
+  els.searchClose.addEventListener("click", closeSearch);
+
   els.historyBtn.addEventListener("click", async () => {
     const show = els.historyPanel.classList.contains("hidden");
     if (show) await renderHistoryList();
     els.historyPanel.classList.toggle("hidden");
   });
+  els.deleteSelected.addEventListener("click", deleteSelectedConversations);
   els.clearHistory.addEventListener("click", async () => {
     // Per-tab: clear only THIS workspace's saved conversations (the panel is filtered).
     const all = await listConversations();
@@ -1419,12 +1854,13 @@ function wire() {
   // Clicking ANYWHERE on the page bar expands/collapses the tabs panel — except the
   // 🖱 pick button, which launches element capture instead.
   els.pageBar.addEventListener("click", async (e) => {
-    if (els.pickEl.contains(e.target)) return;
+    if (els.pickEl.contains(e.target) || els.captureRegion.contains(e.target)) return;
     const show = els.tabsPanel.classList.contains("hidden");
     if (show) await buildTabsList();
     els.tabsPanel.classList.toggle("hidden");
   });
   els.pickEl.addEventListener("click", (e) => { e.stopPropagation(); picking ? cancelPicking() : pickElement(); });
+  els.captureRegion.addEventListener("click", (e) => { e.stopPropagation(); capturing ? cancelCapture() : captureRegion(); });
   els.tabsRefresh.addEventListener("click", (e) => { e.stopPropagation(); buildTabsList(); });
   els.tabsList.addEventListener("change", persistSelectedTabs);
 
@@ -1507,10 +1943,41 @@ function addThinkBlock() {
   return body;
 }
 
+// Animated "the model is working" indicator, shown from the moment we send until
+// the first token (or reasoning) streams back — so the response area is never blank
+// while we wait. Cycles a few phrases with a pulsing-dots animation.
+function addPendingIndicator() {
+  els.empty.classList.add("hidden");
+  const wrap = addMessage("assistant", "");
+  wrap.classList.add("pending-msg");
+  const ind = document.createElement("div");
+  ind.className = "typing";
+  const dots = document.createElement("span");
+  dots.className = "typing-dots";
+  for (let k = 0; k < 3; k++) dots.appendChild(document.createElement("i"));
+  const label = document.createElement("span");
+  label.className = "typing-label";
+  const phrases = [t("think.working"), t("think.reading"), t("think.reasoning"), t("think.almost")];
+  let pi = 0;
+  label.textContent = phrases[0] + "…";
+  ind.appendChild(dots); ind.appendChild(label);
+  wrap.appendChild(ind);
+  els.messages.scrollTop = els.messages.scrollHeight;
+  wrap._iv = setInterval(() => { pi = (pi + 1) % phrases.length; label.textContent = phrases[pi] + "…"; }, 1800);
+  return wrap;
+}
+function removePending(node) {
+  if (!node) return;
+  if (node._iv) { clearInterval(node._iv); node._iv = null; }
+  node.remove();
+}
+
 // Streaming sink: owns one assistant card (+ optional model badge) and its
-// thinking block. Used for a normal turn and for each compare run.
-function makeSink(badgeLabel, showThink = true) {
+// thinking block. Used for a normal turn and for each compare run. `pendingEl` is
+// the animated waiting indicator, removed as soon as the first content arrives.
+function makeSink(badgeLabel, showThink = true, pendingEl = null) {
   let el = null, contentEl = null, raw = "", think = null;
+  const dropPending = () => { if (pendingEl) { removePending(pendingEl); pendingEl = null; } };
   const ensure = () => {
     if (el) return;
     el = addMessage("assistant", "");
@@ -1525,6 +1992,7 @@ function makeSink(badgeLabel, showThink = true) {
   };
   return {
     onText(delta) {
+      dropPending();
       ensure();
       raw += delta;
       contentEl.innerHTML = renderMarkdown(raw);
@@ -1536,11 +2004,13 @@ function makeSink(badgeLabel, showThink = true) {
       // request, so we gate the DISPLAY here — that's the "reasoning shows even when
       // unchecked" fix.
       if (!showThink) return;
+      dropPending();
       if (!think) think = addThinkBlock();
       think.textContent += delta;
       els.messages.scrollTop = els.messages.scrollHeight;
     },
     finalize() {
+      dropPending();
       if (contentEl) { contentEl.innerHTML = renderMarkdown(raw); enhanceArtifacts(contentEl); }
     },
     getRaw: () => raw,
@@ -1617,9 +2087,134 @@ function confirmAction(name, input) {
     els.confirmDeny.addEventListener("click", onDeny);
   });
 }
+// ----- Efficiency: context cleaning + cheap-model routing + compaction -------
+// Trim boilerplate so the user pays only for meaningful tokens (and gets a faster
+// first token from a smaller prompt). Lossless-ish: we collapse whitespace, drop
+// blank/duplicate consecutive lines and obvious chrome ("cookie", "menu" one-liners
+// repeated). Only runs when settings.cleanContext is on.
+function cleanText(s) {
+  if (!s) return "";
+  if (!settings.cleanContext) return s;
+  const lines = String(s).replace(/\r/g, "").split("\n");
+  const out = [];
+  let prev = null, blank = 0;
+  for (let raw of lines) {
+    const line = raw.replace(/[ \t ]+/g, " ").trim();
+    if (!line) { if (++blank > 1) continue; out.push(""); prev = null; continue; }
+    blank = 0;
+    if (line === prev) continue;          // drop immediate duplicate lines
+    out.push(line);
+    prev = line;
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+// Total characters across a native history (≈4 chars/token) — used only to decide
+// WHEN to compact the conversation.
+function historyChars(h) {
+  let n = 0;
+  for (const m of h || []) {
+    const c = m && m.content;
+    if (typeof c === "string") n += c.length;
+    else if (Array.isArray(c)) for (const p of c) n += (p && p.text ? p.text.length : 0);
+  }
+  return n;
+}
+
+// The cheap "housekeeping" model used for summaries / compaction / auto-titles when
+// smartRouting is on, so the premium model the user picked is spent only on answers.
+// settings.utilityModel pins one; "" = auto-pick the cheapest FREE connected model
+// (a free OpenRouter model, else the current selection as a last resort).
+function utilitySelection() {
+  if (settings.utilityModel) {
+    const u = parseSel(settings.utilityModel);
+    if (u.providerId && !currentKeyMissing(u.providerId)) return u;
+  }
+  if (isConnectedFree("openrouter") && settings.orModels && settings.orModels.length) {
+    const free = settings.orModels
+      .filter((m) => !m.prompt && !m.completion && !orUnavailable.has(m.id))
+      .sort((a, b) => a.id.length - b.id.length); // shortest id ≈ smallest/fastest free model
+    if (free.length) return { providerId: "openrouter", modelId: free[0].id };
+  }
+  return currentSelection();
+}
+function isConnectedFree(pid) { return !currentKeyMissing(pid) && providersToShow().includes(pid); }
+
+// One-shot, non-streaming-ish completion on a given model. Returns plain text.
+async function runUtilityCompletion(sel, system, userText, signal) {
+  const provider = makeProvider(
+    { ...settings, provider: sel.providerId, models: { ...settings.models, [sel.providerId]: sel.modelId } },
+    { thinking: false, webSearch: false }
+  );
+  const turn = await provider.runTurn({
+    system, history: [{ role: "user", content: userText }], tools: [],
+    onText: null, onThink: null, signal,
+  });
+  return (turn && turn.text || "").trim();
+}
+
+// Compact a session's NATIVE history when it grows past the budget: summarise the
+// OLD turns with the cheap model and keep only the recent ones verbatim. The UI
+// transcript is untouched — the user still sees everything; only the model payload
+// shrinks (that's the token saving). No-op for agent mode (tool messages) or when
+// disabled. Returns true if it compacted.
+const COMPRESS_TRIGGER_CHARS = 28000; // ~7k tokens of native history → start compacting
+const COMPRESS_KEEP_TAIL = 6;         // recent native messages always kept verbatim
+let compressing = false;
+async function maybeCompressSession(sess, sessMode, signal) {
+  if (!settings.compressHistory || compressing) return false;
+  if (sessMode === "agent") return false; // keep tool-call sequences intact
+  const h = sess.history;
+  if (!Array.isArray(h) || h.length <= COMPRESS_KEEP_TAIL + 2) return false;
+  if (historyChars(h) < COMPRESS_TRIGGER_CHARS) return false;
+  // Find a cut point that keeps the tail starting on a USER message (valid for both
+  // wire formats), so we never break role alternation.
+  let cut = Math.max(1, h.length - COMPRESS_KEEP_TAIL);
+  while (cut < h.length && h[cut].role !== "user") cut++;
+  if (cut >= h.length) return false;
+  const older = h.slice(0, cut);
+  const olderText = older.map((m) => {
+    const c = m.content;
+    const txt = typeof c === "string" ? c : Array.isArray(c) ? c.map((p) => p && p.text || "").join(" ") : "";
+    return `${m.role === "assistant" ? "Assistant" : "User"}: ${txt}`;
+  }).join("\n").slice(0, 24000);
+  if (!olderText.trim()) return false;
+  let summary = "";
+  try {
+    compressing = true;
+    const sel = settings.smartRouting ? utilitySelection() : currentSelection();
+    summary = await runUtilityCompletion(
+      sel,
+      "You compress chat history. Produce a dense, faithful summary that preserves names, facts, decisions, code identifiers and open questions, so the assistant can continue seamlessly. No preamble.",
+      `Summarise the earlier part of this conversation in under 200 words:\n\n${olderText}`,
+      signal
+    );
+  } catch (_) {
+    summary = ""; // on any failure, fall back to a local truncation below
+  } finally {
+    compressing = false;
+  }
+  if (!summary) summary = olderText.slice(0, 1500); // safe local fallback
+  const note = `[Earlier conversation summary — older messages were compacted to save tokens]\n${summary}\n\n[End of summary]`;
+  // Prepend the summary INTO the first kept (user) message so we don't introduce a
+  // stray message that could break alternation on strict APIs.
+  const tail = h.slice(cut);
+  const first = tail[0];
+  if (typeof first.content === "string") {
+    first.content = note + "\n\n" + first.content;
+  } else if (Array.isArray(first.content)) {
+    const ti = first.content.findIndex((p) => p && p.type === "text");
+    if (ti >= 0) first.content[ti] = { ...first.content[ti], text: note + "\n\n" + first.content[ti].text };
+    else first.content.unshift({ type: "text", text: note });
+  }
+  sess.history = tail;
+  if (mode === sessMode) history = sess.history; // keep the live global pointing at the compacted array
+  if (mode === sessMode) addMessage("tool", t("ctx.compacted"));
+  return true;
+}
+
 function pageContextBlock() {
   if (!currentPage) return "";
-  const ctx = (currentPage.text || "").slice(0, settings.maxPageChars);
+  const ctx = cleanText((currentPage.text || "")).slice(0, settings.maxPageChars);
   return (
     `[Active page context]\nTitle: ${currentPage.title}\nURL: ${currentPage.url}\n` +
     (currentPage.description ? `Description: ${currentPage.description}\n` : "") + `${ctx}\n\n`
@@ -1680,6 +2275,7 @@ async function compareLast(second, btn) {
   }
   btn.disabled = true;
   startBusy();
+  let cmpPending = null;
   const badge = `${PROVIDERS[second.providerId].label} · ${second.modelId}`;
   try {
     const provider = makeProvider(
@@ -1687,14 +2283,17 @@ async function compareLast(second, btn) {
       { thinking: els.thinking.checked, webSearch: els.webSearch.checked || lastForceWeb }
     );
     const system = buildSystemPrompt({ agentMode: false, targetLang: settings.targetLang, responseLang: settings.responseLang, mode: lastRunMode, blockPayments: settings.blockPayments });
-    const sink = makeSink(badge, els.thinking.checked);
+    cmpPending = addPendingIndicator();
+    const sink = makeSink(badge, els.thinking.checked, cmpPending);
     await runConversation({ provider, system, history: [{ role: "user", content: lastUserContent }], tools: [], onText: sink.onText, onThink: sink.onThink, signal: abortController.signal });
     sink.finalize();
     if (sink.getRaw()) transcript.push({ role: "assistant", text: `**${badge}**\n\n${sink.getRaw()}` });
     attachCompareBar(sink.getEl()); // allow comparing again with yet another model
   } catch (e) {
+    removePending(cmpPending);
     showRunError(second.providerId, e, second.modelId);
   } finally {
+    removePending(cmpPending);
     endBusy();
     btn.disabled = false;
     await saveCurrent();
@@ -1773,6 +2372,8 @@ async function sendToModel(displayText, modelContent, { forceWeb = false, runMod
   if (isolated) {
     turnHistory = [{ role: "user", content: userContent }];
   } else {
+    // Token saving: summarise older turns before this one when the thread is long.
+    await maybeCompressSession(sess, sessMode, abortController && abortController.signal);
     sess.history.push({ role: "user", content: userContent });
     turnHistory = sess.history;
   }
@@ -1782,7 +2383,8 @@ async function sendToModel(displayText, modelContent, { forceWeb = false, runMod
   );
   const system = buildSystemPrompt({ agentMode, targetLang: settings.targetLang, responseLang: settings.responseLang, mode: runMode, blockPayments: settings.blockPayments });
   const tools = activeTools({ agentMode });
-  const sink = makeSink(badge, els.thinking.checked);
+  const pending = addPendingIndicator();
+  const sink = makeSink(badge, els.thinking.checked, pending);
   try {
     await runConversation({
       provider, system, history: turnHistory, tools,
@@ -1802,10 +2404,14 @@ async function sendToModel(displayText, modelContent, { forceWeb = false, runMod
       if (mode === sessMode) attachCompareBar(sink.getEl()); // compare bar only if still on this tab
     }
   } catch (e) {
+    removePending(pending);
     showRunError(turnSel.providerId, e, turnSel.modelId);
   } finally {
+    removePending(pending);
     endBusy();
     await saveSession(sess, sessMode, sel);
+    // Keep an open history panel in sync (e.g. the new conversation gets its title).
+    if (mode === sessMode && !els.historyPanel.classList.contains("hidden")) renderHistoryList();
   }
 }
 
@@ -1827,7 +2433,16 @@ async function onChatSend() {
   clearAttachments();
   let prefix = "";
   if (!agentActive()) {
-    if (els.pageCtx.checked && currentPage) prefix += pageContextBlock();
+    // Send a page's content only ONCE per conversation (it stays in history after
+    // that), so follow-up questions don't re-pay for the same page text every turn.
+    if (els.pageCtx.checked && currentPage) {
+      const sess = getSession(mode);
+      const key = currentPage.url || "";
+      if (!settings.cleanContext || !sess.pageCtxKeys.has(key)) {
+        prefix += pageContextBlock();
+        sess.pageCtxKeys.add(key);
+      }
+    }
     prefix += await selectedTabsContext();
   }
   if (textBlock) prefix += textBlock; // attached files/PDFs folded in as context
@@ -1932,7 +2547,7 @@ async function runImage(prompt) {
   const status = addMessage("tool", t("image.generating"));
   startBusy();
   try {
-    const urls = await generateImage(settings, { prompt, size: els.imageSize.value || settings.imageSize, signal: abortController.signal });
+    const urls = await generateImage(settings, { prompt, size: els.imageSize.value, signal: abortController.signal });
     status.remove();
     const wrap = addMessage("assistant", "");
     for (const u of urls) {
@@ -2000,7 +2615,7 @@ async function compareImage(second, btn) {
   try {
     const urls = await generateImage(
       { ...settings, imageProvider: second.providerId, imageModel: second.modelId },
-      { prompt: lastUserContent, size: els.imageSize.value || settings.imageSize, signal: abortController.signal }
+      { prompt: lastUserContent, size: els.imageSize.value, signal: abortController.signal }
     );
     status.remove();
     const wrap = addMessage("assistant", "");

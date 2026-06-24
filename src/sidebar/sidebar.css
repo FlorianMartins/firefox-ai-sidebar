@@ -87,7 +87,9 @@ body.rail-collapsed #rail { display: none; }
 /* All four header actions (History, New, Expand, Settings) are now SVG icons sharing
    one gradient + the same .icon-accent hover/active animation, so they behave
    identically. Sizing comes from each <svg> width/height. */
-.icon-accent svg { display: block; }
+/* overflow:visible so a glyph whose path reaches the viewBox edge (e.g. the gear's
+   right tooth) is never clipped on the right. */
+.icon-accent svg { display: block; overflow: visible; }
 .icon-accent:active { transform: translateY(0) scale(0.94); }
 
 /* ----- Workspace: left activity rail + work area ----- */
@@ -182,10 +184,15 @@ body.rail-right .rail { border-right: 0; border-left: 1px solid var(--border-sof
   border-radius: 9px; cursor: pointer; font-size: 12.5px;
 }
 .histrow:hover { background: var(--panel); }
-.histrow .htitle { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.histrow .hmeta { color: var(--muted); font-size: 11px; }
-.histrow .hdel { color: var(--muted); border: 0; background: none; padding: 2px 5px; border-radius: 6px; }
+.histrow .htitle { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.histrow .hmeta { color: var(--muted); font-size: 11px; flex: 0 0 auto; }
+.histrow .hdel { color: var(--muted); border: 0; background: none; padding: 2px 5px; border-radius: 6px; flex: 0 0 auto; }
 .histrow .hdel:hover { color: #ff8a8a; background: var(--panel-2); }
+.histrow .hrename { flex: 1; min-width: 0; font-size: 12.5px; padding: 3px 6px; background: var(--panel-2); border: 1px solid var(--accent); border-radius: 6px; color: var(--text); }
+.histrow .hrename:focus { outline: none; }
+.histrow .hsel { flex: 0 0 auto; accent-color: var(--accent); margin: 0 2px 0 0; cursor: pointer; }
+.link-btn.danger { color: #ff8a8a; }
+.link-btn.danger:hover { color: #ffb3b3; }
 .tabrow { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 8px; cursor: pointer; font-size: 12.5px; }
 .tabrow:hover { background: var(--panel); }
 .tabrow input { accent-color: var(--accent); flex: 0 0 auto; }
@@ -199,8 +206,10 @@ body.rail-right .rail { border-right: 0; border-left: 1px solid var(--border-sof
 }
 .pagebar:hover { color: var(--text); }
 .pagebar .icon { width: 24px; height: 24px; font-size: 12px; }
-#pickEl.icon { font-size: 13px; }
-#pickEl.active { background: var(--grad); box-shadow: 0 0 0 2px var(--accent-2); }
+#pickEl.icon, #captureRegion.icon { font-size: 13px; }
+#pickEl.active, #captureRegion.active { background: var(--grad); box-shadow: 0 0 0 2px var(--accent-2); }
+#captureRegion svg { display: block; }
+#captureRegion.active { color: #fff; }
 .page-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ----- Messages ----- */
@@ -280,6 +289,9 @@ body.rail-right .rail { border-right: 0; border-left: 1px solid var(--border-sof
 #pdfControls { gap: 6px; flex-wrap: wrap; }
 #pdfControls .chip { flex: 0 0 auto; padding: 6px 10px; }
 #pdfInfo { font-size: 11.5px; flex: 1 1 100%; color: var(--muted); }
+/* When no PDF is loaded the info line is empty — collapse it so it doesn't add a
+   blank full-width row (the gap between "Load PDF" and the model picker below). */
+#pdfInfo:empty { display: none; }
 
 /* ----- Composer ----- */
 .composer {
@@ -528,5 +540,64 @@ body.mode-code #confirmBar { display: none !important; }
 }
 .cmp-btn:hover { border-color: var(--accent); }
 .cmp-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* ----- Thinking / waiting indicator (shown until the first token) ---------- */
+.pending-msg .typing { display: inline-flex; align-items: center; gap: 9px; color: var(--muted); }
+.typing-dots { display: inline-flex; gap: 4px; }
+.typing-dots i {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-2), var(--accent));
+  animation: typing-bounce 1.2s infinite ease-in-out both;
+}
+.typing-dots i:nth-child(2) { animation-delay: 0.18s; }
+.typing-dots i:nth-child(3) { animation-delay: 0.36s; }
+.typing-label { font-size: 12.5px; background: var(--grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: pulse-dim 1.6s ease-in-out infinite; }
+@keyframes typing-bounce { 0%, 80%, 100% { transform: scale(0.5); opacity: 0.5; } 40% { transform: scale(1); opacity: 1; } }
+@keyframes pulse-dim { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+/* ----- Drag & drop overlay ------------------------------------------------- */
+.drop-overlay {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(15, 17, 23, 0.82); backdrop-filter: blur(2px);
+  border: 2px dashed var(--accent); border-radius: 14px; margin: 8px;
+  color: var(--text); font-weight: 600; font-size: 15px; pointer-events: none;
+}
+.drop-overlay span { padding: 14px 20px; background: var(--grad-soft); border-radius: 12px; }
+
+/* ----- In-conversation search --------------------------------------------- */
+.searchbar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 9px; background: var(--panel-2);
+  border-bottom: 1px solid var(--border);
+}
+.searchbar .search-ic { font-size: 13px; opacity: 0.8; }
+.searchbar input {
+  flex: 1; min-width: 0; padding: 6px 9px; font-size: 13px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+}
+.searchbar input:focus { outline: none; border-color: var(--accent); }
+.searchbar .search-count { font-size: 11.5px; color: var(--muted); min-width: 34px; text-align: center; }
+.searchbar .icon { width: 26px; height: 26px; font-size: 12px; }
+mark.search-hit { background: rgba(168, 85, 247, 0.35); color: inherit; border-radius: 3px; padding: 0 1px; }
+mark.search-hit.current { background: #f6c945; color: #1a1408; }
+
+/* ----- History row actions (rename · share · delete) + Current tag --------- */
+.histrow .hact { color: var(--muted); border: 0; background: none; padding: 2px 4px; border-radius: 6px; font-size: 13px; line-height: 1; flex: 0 0 auto; }
+.histrow .hact:hover { background: var(--panel-2); }
+.histrow .hren:hover { color: var(--text); }
+.histrow .hshare:hover { color: #8ab4ff; }
+.histrow.current { background: var(--grad-soft); }
+.hcur {
+  flex: 0 0 auto; font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: #fff; background: var(--grad);
+  padding: 1px 6px; border-radius: 999px; white-space: nowrap;
+}
+.share-head { font-size: 12px; color: var(--muted); padding: 4px 6px 6px; }
+.share-target { cursor: pointer; }
+.share-cancel { text-align: center; color: var(--accent); cursor: pointer; padding: 8px; font-size: 12.5px; }
+.share-cancel:hover { background: var(--panel); }
+.share-result { text-align: center; padding: 12px 8px; font-size: 12.5px; color: var(--text); background: var(--grad-soft); border-radius: 9px; }
+.share-result.spinning { animation: pulse-dim 1s ease-in-out infinite; }
 
 .hidden { display: none !important; }

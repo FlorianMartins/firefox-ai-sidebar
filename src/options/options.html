@@ -130,7 +130,6 @@
           Zero server retention: this extension has no server.
         </p>
         <label class="switch"><input type="checkbox" id="blockPayments" /><span class="track"></span><span class="lbl" data-i18n-html="opt.sec.block"><b>Anti-purchase guardrail</b>: the agent can never pay/checkout</span></label>
-        <label class="switch"><input type="checkbox" id="webmailAssist" /><span class="track"></span><span class="lbl" data-i18n="opt.sec.webmail">« Reply with AI » button on webmails (never auto-sends)</span></label>
         <label class="switch"><input type="checkbox" id="saveHistory" /><span class="track"></span><span class="lbl" data-i18n="opt.sec.save">Save conversation history (local only)</span></label>
         <button id="clearHistoryBtn" class="ghost" data-i18n="opt.sec.clearBtn">Clear all history</button>
       </section>
@@ -146,6 +145,17 @@
         <label class="switch"><input type="checkbox" id="autoReadPage" /><span class="track"></span><span class="lbl" data-i18n="opt.behavior.autoread">Re-read the page on each navigation (incl. subdomain)</span></label>
         <label><span data-i18n="opt.behavior.maxchars">Max page context size (characters)</span>
           <input type="number" id="maxPageChars" min="1000" max="100000" step="1000" />
+        </label>
+      </section>
+
+      <section id="sec-efficiency">
+        <h2 data-i18n="opt.eff.h">⚡ Speed &amp; token cost</h2>
+        <p class="muted" data-i18n="opt.eff.lead">Trim what is sent to the model so you only pay for tokens that matter — which also speeds up the first response.</p>
+        <label class="switch"><input type="checkbox" id="cleanContext" /><span class="track"></span><span class="lbl" data-i18n="opt.eff.clean">Clean &amp; de-duplicate page text, and send a page only once per conversation</span></label>
+        <label class="switch"><input type="checkbox" id="compressHistory" /><span class="track"></span><span class="lbl" data-i18n="opt.eff.compress">Summarise older messages in long conversations to save tokens</span></label>
+        <label class="switch"><input type="checkbox" id="smartRouting" /><span class="track"></span><span class="lbl" data-i18n="opt.eff.routing">Smart routing: use a cheap/free model for summaries &amp; compaction (premium model kept for answers)</span></label>
+        <label><span data-i18n="opt.eff.utility">Utility model (housekeeping)</span>
+          <select id="utilityModel"></select>
         </label>
       </section>
 

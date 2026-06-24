@@ -4,9 +4,8 @@
 //
 // Responsibilities here:
 //   1. Sider-style right-click menus on the page / selection.
-//   2. Relaying the webmail "draft reply" request to the sidebar.
-// In both cases we drop a pending action into storage.local and open the
-// sidebar, which picks it up and runs it.
+// We drop a pending action into storage.local and open the sidebar, which picks
+// it up and runs it.
 
 // Context-menu items. Contexts are fixed; titles are localised (English default,
 // French when the user picks uiLang="fr" in Settings).
@@ -113,14 +112,3 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
   openSidebar(tab);
 });
 
-// Webmail helper: the content-script button forwards the email thread here.
-// If the sidebar is already open it also receives this message directly and acts
-// live; this handler is the fallback that queues the draft and tries to open.
-browser.runtime.onMessage.addListener((msg, sender) => {
-  if (msg && msg.type === "draft_reply") {
-    browser.storage.local.set({
-      pendingAction: { action: "reply", text: msg.thread || "", ts: Date.now() },
-    });
-    openSidebar(sender && sender.tab);
-  }
-});
