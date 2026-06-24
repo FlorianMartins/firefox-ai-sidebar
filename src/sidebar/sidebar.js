@@ -1049,11 +1049,26 @@ function openInTab() {
 // so the next message can ask a question grounded in that exact element.
 let picking = false;
 let pickTabId = null;
-async function getActiveTabId() {
+async function getActiveTab() {
+  // Robust across window setups: the sidebar's currentWindow can be ambiguous, so
+  // fall back to the last-focused window, then any active tab.
   try {
-    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-    return tabs && tabs[0] ? tabs[0].id : null;
+    let tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    if (!tabs || !tabs[0]) tabs = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+    if (!tabs || !tabs[0]) tabs = await browser.tabs.query({ active: true });
+    return tabs && tabs[0] ? tabs[0] : null;
   } catch (_) { return null; }
+}
+async function getActiveTabId() {
+  const t = await getActiveTab();
+  return t ? t.id : null;
+}
+// Only genuinely privileged browser pages can't host a content script. Everything
+// else — http(s) on any host/port, intranet, self-signed, deep-web services — must work.
+function isRestrictedUrl(url) {
+  return !url
+    || /^(about:|moz-extension:|chrome:|chrome-extension:|resource:|view-source:|data:|javascript:|edge:|opera:|vivaldi:|brave:)/i.test(url)
+    || /^https:\/\/(addons\.mozilla\.org|chromewebstore\.google\.com|chrome\.google\.com\/webstore)/i.test(url);
 }
 // captureVisibleTab needs the `<all_urls>` host permission to be GRANTED. In an
 // installed MV3 build that permission is optional and not granted at install (unlike
@@ -1072,18 +1087,34 @@ async function ensurePagePermission() {
   }
 }
 
-// Send a message to the tab's content script; if it isn't there yet (page opened
-// before the extension loaded), inject it on demand and retry. Throws if it still
-// can't be reached.
+// Send a message to the tab's content script. If it isn't there yet (the page was
+// open before the extension loaded / before host access was granted), inject it on
+// demand and retry. Designed to work on EVERY scriptable page — http(s) on any host
+// or port, intranet, self-signed, deep-web web services. Throws only if the page is
+// truly unscriptable (a privileged browser page) or injection keeps failing.
+const CONTENT_FILES = ["vendor/browser-polyfill.min.js", "src/content/content.js"];
 async function sendToTab(tabId, msg) {
+  // 1) Fast path: the content script is already present.
+  try { return await browser.tabs.sendMessage(tabId, msg); } catch (_) {}
+  // 2) Inject on demand. Try the top frame first, then all frames (some apps live
+  //    inside a child frame), tolerating "already injected" errors.
+  let injected = false;
   try {
-    return await browser.tabs.sendMessage(tabId, msg);
-  } catch (e) {
+    await browser.scripting.executeScript({ target: { tabId }, files: CONTENT_FILES });
+    injected = true;
+  } catch (_) {
     try {
-      await browser.scripting.executeScript({ target: { tabId }, files: ["vendor/browser-polyfill.min.js", "src/content/content.js"] });
-      return await browser.tabs.sendMessage(tabId, msg);
-    } catch (_) { throw e; }
+      await browser.scripting.executeScript({ target: { tabId, allFrames: true }, files: CONTENT_FILES });
+      injected = true;
+    } catch (_) {}
   }
+  if (!injected) throw new Error("cannot inject content script on this page");
+  // 3) The freshly-registered listener may need a tick — retry a few times.
+  for (let i = 0; i < 5; i++) {
+    try { return await browser.tabs.sendMessage(tabId, msg); }
+    catch (_) { await new Promise((r) => setTimeout(r, 100)); }
+  }
+  throw new Error("content script unreachable after injection");
 }
 // ----- Agent activity glow --------------------------------------------------
 // A pulsing border on the page the agent is acting on (à la Perplexity). We glow the
@@ -1124,8 +1155,10 @@ function cancelPicking() {
 }
 async function pickElement() {
   if (picking || capturing) return;
-  const tabId = await getActiveTabId();
-  if (tabId == null) { addMessage("error", t("pick.error")); return; }
+  const tab = await getActiveTab();
+  if (!tab) { addMessage("error", t("pick.error")); return; }
+  if (isRestrictedUrl(tab.url)) { addMessage("error", t("pick.restricted")); return; }
+  const tabId = tab.id;
   if (mode !== "chat" && mode !== "agent") setMode("chat");
   picking = true; pickTabId = tabId; els.pickEl.classList.add("active");
   const note = addMessage("tool", t("pick.start"));
@@ -1134,7 +1167,7 @@ async function pickElement() {
     res = await sendToTab(tabId, { type: "pick_element" });
   } catch (_) {
     note.remove(); finishPicking();
-    addMessage("error", t("pick.error"));
+    addMessage("error", t("region.reload"));
     return;
   }
   note.remove(); finishPicking();
@@ -1171,8 +1204,10 @@ function cancelCapture() {
 }
 async function captureRegion() {
   if (capturing || picking) return;
-  const tabId = await getActiveTabId();
-  if (tabId == null) { addMessage("error", t("pick.error")); return; }
+  const tab = await getActiveTab();
+  if (!tab) { addMessage("error", t("pick.error")); return; }
+  if (isRestrictedUrl(tab.url)) { addMessage("error", t("pick.restricted")); return; }
+  const tabId = tab.id;
   if (mode !== "chat" && mode !== "agent") setMode("chat");
   capturing = true; pickTabId = tabId; els.captureRegion.classList.add("active");
   const note = addMessage("tool", t("region.start"));
@@ -1181,7 +1216,7 @@ async function captureRegion() {
     res = await sendToTab(tabId, { type: "capture_region" });
   } catch (_) {
     note.remove(); finishCapture();
-    addMessage("error", t("pick.error"));
+    addMessage("error", t("region.reload"));
     return;
   }
   note.remove(); finishCapture();
