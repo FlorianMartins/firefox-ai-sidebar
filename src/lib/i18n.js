@@ -8,6 +8,8 @@
 // it in at load time; dynamic strings call `t(key, vars)` directly. Interpolation
 // uses {name} placeholders replaced from the `vars` object.
 
+import { ES, DE, IT, PT } from "./i18n-langs.js";
+
 let lang = "en";
 
 const EN = {
@@ -44,6 +46,14 @@ const EN = {
   "pick.imgName": "Element screenshot <{tag}>",
   "pick.added": "✓ Captured a <{tag}> element — ask your question below.",
   "pick.addedN": "✓ Captured {n} elements — ask your question below.",
+
+  "region.title": "Capture an area of the page (screenshot) as context",
+  "region.start": "🔳 Draw a rectangle over the page to capture it. (Esc, the button, or a click in the sidebar cancels)",
+  "region.error": "Couldn't capture this area (try again on a normal website).",
+  "region.imgName": "Page capture",
+  "region.added": "✓ Captured the area — ask your question below.",
+  "region.reload": "Extension updated — refresh this web page once, then try the capture again.",
+  "region.perm": "Screen-capture permission is needed — please allow access when prompted, then try again.",
 
   "mic.title": "Dictate (voice to text)",
   "mic.listening": "Listening… click to stop",
@@ -196,6 +206,42 @@ const EN = {
   "history.empty": "No saved conversation.",
   "history.untitled": "Conversation",
   "delete.title": "Delete",
+  "history.current": "Current",
+  "history.newEntry": "New conversation",
+  "history.deleteSelected": "🗑 Delete selected ({n})",
+  "history.deleteSelTitle": "Delete the selected conversations",
+  "hist.renameTitle": "Rename this conversation",
+  "hist.selectTitle": "Select",
+  "hist.shareTitle": "Add this conversation as context to another one",
+  "share.pickTitle": "Add to which conversation?",
+  "share.none": "No other conversation in this workspace.",
+  "share.cancel": "Cancel",
+  "share.importing": "⏳ Importing…",
+  "share.done": "✓ Added “{title}” as context to this conversation.",
+  "share.addedTo": "✓ Added to “{title}”.",
+  "share.already": "Already imported — skipped.",
+  "share.injected": "📎 Imported context from a previous conversation: “{title}”.",
+
+  // ----- In-conversation search ----------------------------------------------
+  "search.title": "Search in this conversation",
+  "search.ph": "Search in the conversation…",
+  "search.prev": "Previous match",
+  "search.next": "Next match",
+  "search.close": "Close search",
+  "search.count": "{i}/{n}",
+  "search.none": "No match",
+
+  // ----- Thinking / loading indicator ----------------------------------------
+  "think.working": "Thinking",
+  "think.reading": "Reading the context",
+  "think.reasoning": "Reasoning",
+  "think.almost": "Almost there",
+
+  // ----- Drag & drop ---------------------------------------------------------
+  "drop.hint": "Drop files here to attach them",
+
+  // ----- Efficiency / routing ------------------------------------------------
+  "ctx.compacted": "🗜 Older messages were summarised to save tokens.",
 
   // ----- Compare / send ------------------------------------------------------
   "compare.with": "⚖ Compare with",
@@ -208,6 +254,7 @@ const EN = {
   "or.enableLink": "→ Enable free models on OpenRouter",
   "err.image": "Image: {msg}",
   "confirm.prompt": "Allow the action “{name}”? {input}",
+  "confirm.sensitive": "⚠ Sensitive action ({action}): allow “{what}”?",
   "err.noKeyModel": "No key for this model. Click “Connect / Add a provider” (⚙).",
   "badge.web": "🌐 Web search · {label} · {model}",
   "badge.agent": "🤖 Agent · {label} · {model}",
@@ -242,6 +289,7 @@ const EN = {
   "image.generating": "Generating the image…",
 
   // ----- Image sizes (by value) ---------------------------------------------
+  "size.none": "Custom (size in prompt)",
   "size.256x256": "Favicon — square 256²",
   "size.512x512": "Small icon — square 512²",
   "size.1024x1024": "Logo / HD square — 1024²",
@@ -308,7 +356,7 @@ const EN = {
   "opt.agent.model": "Agent model",
   "opt.agent.perm": "Agent permissions",
   "opt.agent.permManual": "Manual approval — ask before each action",
-  "opt.agent.permAuto": "Allow everything — no approval prompt",
+  "opt.agent.permAuto": "Allow (default) — run automatically, but still confirm sensitive actions (download, reserve, delete, sign-up…)",
   "opt.agent.p2": "With <b>manual approval</b> (recommended), every state-changing action (click, typing, navigation…) asks for your consent. With <b>allow everything</b>, the agent chains actions without confirmation. In both cases the <b>anti-purchase guardrail</b> stays active: the agent can never pay.",
   "opt.web.h": "🌐 Web search",
   "opt.web.p": "In <b>Web</b> mode the request is sent to a model that can search the web — preferably <b>Perplexity</b> (Sonar) or a <b>free OpenRouter</b> model (built-in web plugin), to avoid spending on Claude. Leave <b>Auto</b> for an automatic pick among your connected providers.",
@@ -328,6 +376,17 @@ const EN = {
   "opt.lang.preset": "Default writing style (Improve mode)",
   "opt.lang.target": "Translation target language",
   "opt.layout.h": "🎨 Appearance & layout",
+  "opt.theme.label": "Theme",
+  "opt.theme.note": "Pick a theme, then optionally fine-tune individual colours on top of it.",
+  "opt.theme.accent": "Accent",
+  "opt.theme.accent2": "Accent 2 (gradient)",
+  "opt.theme.bg": "Background",
+  "opt.theme.panel": "Surface",
+  "opt.theme.text": "Text",
+  "opt.theme.pick": "Eyedropper — pick a colour from anywhere on screen",
+  "opt.theme.pickOs": "Open the colour picker — use its eyedropper to grab any colour on screen",
+  "opt.theme.pickHint": "Click a colour to capture it · Esc to cancel",
+  "opt.theme.reset": "↺ Reset colours to theme",
   "opt.layout.rail": "Tabs menu position",
   "opt.layout.left": "Left (default)",
   "opt.layout.right": "Right",
@@ -336,7 +395,6 @@ const EN = {
   "opt.sec.h": "🔒 Security & privacy",
   "opt.sec.p": "<b>Zero server retention</b>: this extension has no server. Your data (keys, conversations, page content) stays in this browser and is sent only to the AI API you choose. No analytics, no telemetry.",
   "opt.sec.block": "<b>Anti-purchase guardrail</b>: the agent can never pay/checkout",
-  "opt.sec.webmail": "« Reply with AI » button on webmails (never auto-sends)",
   "opt.sec.save": "Save conversation history (local only)",
   "opt.sec.clearBtn": "Clear all history",
   "opt.behavior.h": "🎛 Behavior",
@@ -346,8 +404,17 @@ const EN = {
   "opt.behavior.page": "The AI sees the current page (auto-injected in chat)",
   "opt.behavior.autoread": "Re-read the page on each navigation (incl. subdomain)",
   "opt.behavior.maxchars": "Max page context size (characters)",
+  "opt.eff.h": "⚡ Speed & token cost",
+  "opt.eff.lead": "Trim what is sent to the model so you only pay for tokens that matter — which also speeds up the first response.",
+  "opt.eff.clean": "Clean & de-duplicate page text, and send a page only once per conversation",
+  "opt.eff.compress": "Summarise older messages in long conversations to save tokens",
+  "opt.eff.routing": "Smart routing: use a cheap/free model for summaries & compaction (premium model kept for answers)",
+  "opt.eff.utility": "Utility model (housekeeping)",
+  "opt.eff.utilityAuto": "Auto (cheapest free connected model)",
+  "opt.autosaveNote": "Changes are saved automatically.",
   "opt.save": "Save",
   "opt.saved": "✓ Saved.",
+  "opt.savedAuto": "✓ Saved automatically",
   "opt.cleared": "✓ History cleared.",
   // dynamic (options.js)
   "opt.dyn.connecting": "Connecting…",
@@ -414,6 +481,14 @@ const FR = {
   "pick.imgName": "Capture de l'élément <{tag}>",
   "pick.added": "✓ Élément <{tag}> capturé — posez votre question ci-dessous.",
   "pick.addedN": "✓ {n} éléments capturés — posez votre question ci-dessous.",
+
+  "region.title": "Capturer une zone de la page (capture d'écran) en contexte",
+  "region.start": "🔳 Tracez un rectangle sur la page pour la capturer. (Échap, le bouton, ou un clic dans la sidebar annule)",
+  "region.error": "Impossible de capturer cette zone (réessayez sur un site web normal).",
+  "region.imgName": "Capture de page",
+  "region.added": "✓ Zone capturée — posez votre question ci-dessous.",
+  "region.reload": "Extension mise à jour — rafraîchissez cette page web une fois, puis relancez la capture.",
+  "region.perm": "La permission de capture d'écran est nécessaire — autorisez l'accès dans la fenêtre, puis réessayez.",
 
   "mic.title": "Dicter (voix vers texte)",
   "mic.listening": "Écoute… cliquez pour arrêter",
@@ -556,6 +631,42 @@ const FR = {
   "history.empty": "Aucune conversation enregistrée.",
   "history.untitled": "Conversation",
   "delete.title": "Supprimer",
+  "history.current": "Actuelle",
+  "history.newEntry": "Nouvelle conversation",
+  "history.deleteSelected": "🗑 Supprimer la sélection ({n})",
+  "history.deleteSelTitle": "Supprimer les conversations sélectionnées",
+  "hist.renameTitle": "Renommer cette conversation",
+  "hist.selectTitle": "Sélectionner",
+  "hist.shareTitle": "Ajouter cette conversation en contexte d'une autre",
+  "share.pickTitle": "À quelle conversation l'ajouter ?",
+  "share.none": "Aucune autre conversation dans cet espace.",
+  "share.cancel": "Annuler",
+  "share.importing": "⏳ Import en cours…",
+  "share.done": "✓ « {title} » ajoutée en contexte à cette conversation.",
+  "share.addedTo": "✓ Ajouté à « {title} ».",
+  "share.already": "Déjà importé — ignoré.",
+  "share.injected": "📎 Contexte importé d'une conversation précédente : « {title} ».",
+
+  // ----- In-conversation search ----------------------------------------------
+  "search.title": "Rechercher dans cette conversation",
+  "search.ph": "Rechercher dans la conversation…",
+  "search.prev": "Résultat précédent",
+  "search.next": "Résultat suivant",
+  "search.close": "Fermer la recherche",
+  "search.count": "{i}/{n}",
+  "search.none": "Aucun résultat",
+
+  // ----- Thinking / loading indicator ----------------------------------------
+  "think.working": "Réflexion",
+  "think.reading": "Lecture du contexte",
+  "think.reasoning": "Raisonnement",
+  "think.almost": "Presque terminé",
+
+  // ----- Drag & drop ---------------------------------------------------------
+  "drop.hint": "Déposez des fichiers ici pour les joindre",
+
+  // ----- Efficiency / routing ------------------------------------------------
+  "ctx.compacted": "🗜 Les anciens messages ont été résumés pour économiser des tokens.",
 
   "compare.with": "⚖ Comparer avec",
   "compare.btn": "Comparer",
@@ -567,6 +678,7 @@ const FR = {
   "or.enableLink": "→ Activer les modèles gratuits sur OpenRouter",
   "err.image": "Image : {msg}",
   "confirm.prompt": "Autoriser l'action « {name} » ? {input}",
+  "confirm.sensitive": "⚠ Action sensible ({action}) : autoriser « {what} » ?",
   "err.noKeyModel": "Aucune clé pour ce modèle. Cliquez « Connexion / Ajouter un fournisseur » (⚙).",
   "badge.web": "🌐 Recherche web · {label} · {model}",
   "badge.agent": "🤖 Agent · {label} · {model}",
@@ -599,6 +711,7 @@ const FR = {
   "err.imageKeyMissing": "Clé manquante pour la génération d'images ({label}).",
   "image.generating": "Génération de l'image…",
 
+  "size.none": "Personnalisé (taille dans le prompt)",
   "size.256x256": "Favicon — carré 256²",
   "size.512x512": "Petite icône — carré 512²",
   "size.1024x1024": "Logo / carré HD — 1024²",
@@ -663,7 +776,7 @@ const FR = {
   "opt.agent.model": "Modèle de l'agent",
   "opt.agent.perm": "Autorisations de l'agent",
   "opt.agent.permManual": "Validation manuelle — demander avant chaque action",
-  "opt.agent.permAuto": "Tout autoriser — aucune demande d'autorisation",
+  "opt.agent.permAuto": "Autoriser (défaut) — automatique, mais confirme quand même les actions sensibles (téléchargement, réservation, suppression, inscription…)",
   "opt.agent.p2": "En <b>validation manuelle</b> (recommandé), chaque action modifiant l'état (clic, saisie, navigation…) demande votre accord. En <b>tout autoriser</b>, l'agent enchaîne les actions sans confirmation. Dans les deux cas, le <b>garde-fou anti-achat</b> reste actif : l'agent ne peut jamais payer.",
   "opt.web.h": "🌐 Recherche web",
   "opt.web.p": "En mode <b>Web</b>, la requête est envoyée à un modèle capable de chercher sur le web — de préférence <b>Perplexity</b> (Sonar) ou un modèle <b>gratuit OpenRouter</b> (plugin web intégré), pour éviter de dépenser sur Claude. Laissez <b>Auto</b> pour un choix automatique parmi vos fournisseurs connectés.",
@@ -683,6 +796,17 @@ const FR = {
   "opt.lang.preset": "Style d'écriture par défaut (mode Améliorer)",
   "opt.lang.target": "Langue cible des traductions",
   "opt.layout.h": "🎨 Apparence & disposition",
+  "opt.theme.label": "Thème",
+  "opt.theme.note": "Choisissez un thème, puis ajustez éventuellement certaines couleurs par-dessus.",
+  "opt.theme.accent": "Accent",
+  "opt.theme.accent2": "Accent 2 (dégradé)",
+  "opt.theme.bg": "Arrière-plan",
+  "opt.theme.panel": "Surface",
+  "opt.theme.text": "Texte",
+  "opt.theme.pick": "Pipette — capturer une couleur n'importe où à l'écran",
+  "opt.theme.pickOs": "Ouvrir le sélecteur de couleur — utilisez sa pipette pour capturer n'importe quelle couleur à l'écran",
+  "opt.theme.pickHint": "Cliquez sur une couleur pour la capturer · Échap pour annuler",
+  "opt.theme.reset": "↺ Réinitialiser les couleurs du thème",
   "opt.layout.rail": "Position du menu d'onglets",
   "opt.layout.left": "À gauche (défaut)",
   "opt.layout.right": "À droite",
@@ -691,7 +815,6 @@ const FR = {
   "opt.sec.h": "🔒 Sécurité & confidentialité",
   "opt.sec.p": "<b>Zéro rétention serveur</b> : cette extension n'a aucun serveur. Vos données (clés, conversations, contenu des pages) restent dans ce navigateur et ne sont envoyées qu'à l'API IA que vous choisissez. Aucune analytique, aucune télémétrie.",
   "opt.sec.block": "<b>Garde-fou anti-achat</b> : l'agent ne peut jamais payer/commander",
-  "opt.sec.webmail": "Bouton « Répondre avec l'IA » sur les webmails (jamais d'envoi auto)",
   "opt.sec.save": "Enregistrer l'historique des conversations (local uniquement)",
   "opt.sec.clearBtn": "Effacer tout l'historique",
   "opt.behavior.h": "🎛 Comportement",
@@ -701,8 +824,17 @@ const FR = {
   "opt.behavior.page": "L'IA voit la page consultée (injection auto en mode chat)",
   "opt.behavior.autoread": "Relire la page à chaque navigation (y compris sous-domaine)",
   "opt.behavior.maxchars": "Taille max du contexte de page (caractères)",
+  "opt.eff.h": "⚡ Vitesse & coût en tokens",
+  "opt.eff.lead": "Réduit ce qui est envoyé au modèle pour ne payer que les tokens utiles — ce qui accélère aussi la première réponse.",
+  "opt.eff.clean": "Nettoyer & dédupliquer le texte des pages, et n'envoyer une page qu'une seule fois par conversation",
+  "opt.eff.compress": "Résumer les anciens messages des longues conversations pour économiser des tokens",
+  "opt.eff.routing": "Routage intelligent : un modèle bon marché/gratuit pour les résumés & le compactage (le modèle premium reste pour les réponses)",
+  "opt.eff.utility": "Modèle utilitaire (tâches internes)",
+  "opt.eff.utilityAuto": "Auto (modèle gratuit le moins cher connecté)",
+  "opt.autosaveNote": "Les modifications sont enregistrées automatiquement.",
   "opt.save": "Enregistrer",
   "opt.saved": "✓ Enregistré.",
+  "opt.savedAuto": "✓ Enregistré automatiquement",
   "opt.cleared": "✓ Historique effacé.",
   "opt.dyn.connecting": "Connexion…",
   "opt.dyn.connected": "✓ Connecté à {label}.",
@@ -735,7 +867,7 @@ const FR = {
   "opt.uiFr": "Français",
 };
 
-const DICT = { en: EN, fr: FR };
+const DICT = { en: EN, fr: FR, es: ES, de: DE, it: IT, pt: PT };
 
 export function setLang(l) {
   lang = l === "fr" ? "fr" : "en";
