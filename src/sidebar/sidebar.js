@@ -68,7 +68,6 @@ const els = {
   tabsPanel: $("tabsPanel"),
   tabsList: $("tabsList"),
   tabsRefresh: $("tabsRefresh"),
-  useTabs: $("useTabs"),
   messages: $("messages"),
   empty: $("empty"),
   emptyOnboard: $("emptyOnboard"),
@@ -245,7 +244,6 @@ async function init() {
   els.thinking.checked = settings.thinking;
   els.webSearch.checked = settings.webSearch;
   els.pageCtx.checked = settings.includePageContext;
-  els.useTabs.checked = settings.includeSelectedTabs;
   els.translateLang.value = settings.targetLang || "French";
   els.improvePreset.value = settings.improvePreset || "improve";
   populateImageSizes();
@@ -1392,7 +1390,8 @@ async function persistSelectedTabs() {
   await setSettings({ selectedTabs: ids });
 }
 async function selectedTabsContext() {
-  if (!els.useTabs.checked || !(settings.selectedTabs || []).length) return "";
+  // Any tab the user has ticked is always added to the context (no extra toggle).
+  if (!(settings.selectedTabs || []).length) return "";
   const parts = [];
   for (const tabId of settings.selectedTabs) {
     try {
@@ -1946,7 +1945,6 @@ function wire() {
   bindToggle(els.thinking, "thinking");
   bindToggle(els.webSearch, "webSearch");
   bindToggle(els.pageCtx, "includePageContext", updatePageBar);
-  bindToggle(els.useTabs, "includeSelectedTabs");
 
   els.rail.querySelectorAll(".railtab").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
   els.openCodeApp.addEventListener("click", openCodeApp);
