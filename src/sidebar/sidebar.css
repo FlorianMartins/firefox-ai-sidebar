@@ -321,6 +321,8 @@ body.rail-right .rail { border-right: 0; border-left: 1px solid var(--border-sof
   padding: 9px 6px 5px; background: transparent; border: 0; color: var(--text); display: block;
 }
 .composer textarea:focus { outline: none; }
+/* Brighter, WCAG-friendlier placeholder (lifted off the muted grey toward the text colour). */
+.composer textarea::placeholder { color: color-mix(in srgb, var(--muted) 45%, var(--text)); opacity: 1; }
 /* Second row: an optional left slot (the "+" on the Chat tab) and the chat toggles +
    stop on the right. */
 .composer-tools { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 2px 2px 0; min-height: 0; }
@@ -339,30 +341,36 @@ body.rail-right .rail { border-right: 0; border-left: 1px solid var(--border-sof
 .ctool[hidden] { display: none !important; }
 .ctool.stop { font-size: 12px; }
 
-/* Attach (+) — no background, large and centered (Gemini-style). */
+/* Attach (+) — no background, large and centered (Gemini-style), bright off-white glyph. */
 .attach-btn {
   flex: 0 0 auto; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 10px;
-  background: transparent; color: var(--muted); cursor: pointer; transition: 0.15s;
+  background: transparent; color: color-mix(in srgb, var(--text) 80%, var(--muted));
+  cursor: pointer; transition: 0.15s;
   display: inline-flex; align-items: center; justify-content: center;
 }
 .attach-btn svg { display: block; }
-.attach-btn:hover { color: var(--accent); background: var(--panel); }
+.attach-btn:hover { color: var(--text); background: var(--panel); }
 .attach-btn:active { transform: scale(0.94); }
 .attach-btn[hidden] { display: none !important; }
+/* On the Chat tab the "+" sits in the bottom row next to the toggles: match their
+   32px box so every interactive element shares the same baseline (pixel-perfect). */
+.tools-left .attach-btn { width: 32px; height: 32px; border-radius: 9px; }
 
-/* Chat toggles (Thinking / Web / Page) — sober icon buttons, coloured when active. */
+/* Chat toggles (Thinking / Web / Page) — ghost icon buttons: no border at rest,
+   subtle background on hover, soft accent tint when active. All the same size. */
 .chat-toggles { display: flex; align-items: center; gap: 3px; min-width: 0; }
 .ctoggle {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 9px;
+  width: 32px; height: 32px; border: 1px solid transparent; border-radius: 9px;
   background: transparent; color: var(--muted); cursor: pointer; transition: 0.15s; user-select: none;
 }
 .ctoggle svg { display: block; }
 .ctoggle input { position: absolute; opacity: 0; width: 0; height: 0; }
-.ctoggle:hover { color: var(--text); border-color: var(--accent-2); }
+.ctoggle:hover { color: var(--text); background: var(--panel); }
 .ctoggle:has(input:checked) {
-  color: var(--accent); background: var(--grad-soft); border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--accent); background: var(--grad-soft); border-color: transparent;
 }
+.ctoggle:has(input:checked):hover { background: var(--grad-soft); color: var(--accent); }
 
 /* Attachment preview strip */
 .attach-strip { display: flex; flex-wrap: wrap; gap: 6px; }

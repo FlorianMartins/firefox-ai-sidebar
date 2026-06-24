@@ -1820,6 +1820,25 @@ function wire() {
     e.target.value = ""; // allow re-selecting the same file
   });
 
+  // Paste (Ctrl+V) an image / screenshot directly into the input → attach it.
+  // Plain-text pastes fall through to the textarea's default behaviour.
+  els.input.addEventListener("paste", async (e) => {
+    const dt = e.clipboardData;
+    if (!dt) return;
+    let files = Array.from(dt.files || []);
+    if (!files.length) {
+      files = Array.from(dt.items || [])
+        .filter((it) => it.kind === "file")
+        .map((it) => it.getAsFile())
+        .filter(Boolean);
+    }
+    if (!files.length) return; // nothing but text — let the browser paste it
+    e.preventDefault();
+    if (mode === "code" || mode === "image") setMode("chat");
+    await addAttachmentFiles(files);
+    els.input.focus();
+  });
+
   // Drag & drop files anywhere on the sidebar to attach them (in addition to +).
   let dragDepth = 0;
   const hasFiles = (e) => !!e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files");
