@@ -1,24 +1,24 @@
 /* ============================================================================
-   Hivey AI — design system (dark + yellow/orange "beehive" gradient)
+   Hivey AI — design system (default "dark" theme: blue → purple gradient)
    These :root values are the default-theme fallback; theme.js overwrites them
    live when another theme is selected.
    ========================================================================== */
 :root {
-  --bg: #1c1d20;
-  --panel: #242529;
-  --panel-2: #2c2d31;
-  --elevated: #2c2d3140;
-  --border: #3a3c41;
-  --border-soft: #2a2b2f;
-  --text: #e9e9ec;
-  --muted: #9b9da4;
-  --accent: #f59e0b;
-  --accent-2: #fbbf24;
-  --accent-3: #f97316;
-  --grad: linear-gradient(135deg, #fbbf24 0%, #f59e0b 55%, #f97316 100%);
-  --grad-soft: linear-gradient(135deg, rgba(251, 191, 36, 0.16), rgba(249, 115, 22, 0.16));
-  --user: linear-gradient(135deg, #f59e0b, #f97316);
-  --tool: #242529;
+  --bg: #0f1117;
+  --panel: #161922;
+  --panel-2: #1c2030;
+  --elevated: #20243440;
+  --border: #272c3b;
+  --border-soft: #1f2330;
+  --text: #e7e8ef;
+  --muted: #9aa0b4;
+  --accent: #8b5cf6;
+  --accent-2: #3b82f6;
+  --accent-3: #a855f7;
+  --grad: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 55%, #a855f7 100%);
+  --grad-soft: linear-gradient(135deg, rgba(59, 130, 246, 0.16), rgba(168, 85, 247, 0.16));
+  --user: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  --tool: #1a1f2e;
   --error: #3a1d24;
   --radius: 12px;
   --radius-sm: 9px;
