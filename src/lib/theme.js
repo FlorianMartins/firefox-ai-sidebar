@@ -6,7 +6,7 @@
 
 export const THEMES = {
   hive:   { label: "Hivey (yellow/orange)", bg: "#1c1d20", panel: "#242529", panel2: "#2c2d31", border: "#3a3c41", borderSoft: "#2a2b2f", text: "#e9e9ec", muted: "#9b9da4", accent: "#f59e0b", accent2: "#fbbf24", accent3: "#f97316" },
-  dark:   { label: "Default (dark)", bg: "#0f1117", panel: "#161922", panel2: "#1c2030", border: "#272c3b", borderSoft: "#1f2330", text: "#e7e8ef", muted: "#9aa0b4", accent: "#8b5cf6", accent2: "#3b82f6", accent3: "#a855f7" },
+  dark:   { label: "Default (dark)", bg: "#0f1117", panel: "#161922", panel2: "#1c2030", border: "#272c3b", borderSoft: "#1f2330", text: "#e7e8ef", muted: "#9aa0b4", accent: "#716bf6", accent2: "#3b82f6", accent3: "#a855f7" },
   pro:    { label: "Pro (blue)",     bg: "#0d1117", panel: "#161b22", panel2: "#1c232c", border: "#2a313c", borderSoft: "#21272f", text: "#e6edf3", muted: "#8b949e", accent: "#2f81f7", accent2: "#1f6feb", accent3: "#58a6ff" },
   gamer:  { label: "Gamer (neon)",   bg: "#08080f", panel: "#11111d", panel2: "#191929", border: "#2b2b48", borderSoft: "#20203a", text: "#e9e9ff", muted: "#9a9ac4", accent: "#00e5ff", accent2: "#7c4dff", accent3: "#ff2bd6" },
   modern: { label: "Modern (teal)",  bg: "#0f1417", panel: "#161c21", panel2: "#1e262c", border: "#2a333b", borderSoft: "#222a31", text: "#e8eef2", muted: "#90a0ad", accent: "#10b981", accent2: "#06b6d4", accent3: "#34d399" },
@@ -43,7 +43,7 @@ export function applyTheme(themeKey, custom) {
   set("--accent", c.accent);
   set("--accent-2", c.accent2);
   set("--accent-3", c.accent3);
-  set("--grad", `linear-gradient(135deg, ${c.accent2} 0%, ${c.accent} 55%, ${c.accent3} 100%)`);
+  set("--grad", `linear-gradient(135deg, ${c.accent2} 0%, ${c.accent} 50%, ${c.accent3} 100%)`);
   set("--grad-soft", `linear-gradient(135deg, ${hexToRgba(c.accent2, 0.16)}, ${hexToRgba(c.accent3, 0.16)})`);
   set("--user", `linear-gradient(135deg, ${c.accent2}, ${c.accent})`);
   if (document.body) document.body.classList.toggle("theme-light", themeKey === "light" && !(custom && custom.bg));
