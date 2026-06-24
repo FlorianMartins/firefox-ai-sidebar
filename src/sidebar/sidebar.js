@@ -1024,13 +1024,18 @@ async function getActiveTabId() {
 // captureVisibleTab needs the `<all_urls>` host permission to be GRANTED. In an
 // installed MV3 build that permission is optional and not granted at install (unlike
 // a temporary add-on), which is why the screenshot fails with "Missing activeTab
-// permission". We request it here — and this MUST run synchronously inside the click
-// gesture, so call it FIRST in the handler. Resolves true if already granted.
-function ensurePagePermission() {
+// permission". `<all_urls>` is declared in `optional_host_permissions`, so we can
+// request it here — and this MUST run synchronously inside the click gesture, so call
+// it FIRST in the handler. Resolves true once granted; false if denied/failed (so the
+// caller shows a clear message instead of trying to capture without permission).
+async function ensurePagePermission() {
   try {
-    if (!browser.permissions || !browser.permissions.request) return Promise.resolve(true);
-    return browser.permissions.request({ origins: ["<all_urls>"] }).catch(() => false);
-  } catch (_) { return Promise.resolve(true); }
+    if (!browser.permissions || !browser.permissions.request) return true;
+    const granted = await browser.permissions.request({ origins: ["<all_urls>"] });
+    return !!granted;
+  } catch (_) {
+    return false;
+  }
 }
 
 // Send a message to the tab's content script; if it isn't there yet (page opened

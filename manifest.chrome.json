@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AI Sidebar — IA multi-fournisseurs",
-  "version": "1.22.2",
+  "version": "1.22.3",
   "description": "Sidebar IA (BYOK) : chat, lecture page/élément, traduction, résumé, images, agent. Claude, OpenAI, Gemini, OpenRouter, etc.",
   "author": "Florian Martins",
   "content_security_policy": {
@@ -24,6 +24,9 @@
     "sidePanel"
   ],
   "host_permissions": [
+    "<all_urls>"
+  ],
+  "optional_host_permissions": [
     "<all_urls>"
   ],
   "background": {
