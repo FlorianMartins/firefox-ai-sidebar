@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="Hivey AI">
   <defs>
-    <linearGradient id="hive" x1="12" y1="10" x2="84" y2="86" gradientUnits="userSpaceOnUse">
+    <linearGradient id="hive" x1="8" y1="8" x2="88" y2="88" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#fde047"/>
       <stop offset="0.5" stop-color="#fbbf24"/>
       <stop offset="1" stop-color="#f97316"/>
@@ -10,9 +10,9 @@
        widest on top tapering to the smallest at the bottom.
        Yellow→orange gradient, no background, legible down to favicon size. -->
   <g fill="url(#hive)">
-    <rect x="20" y="13" width="56" height="13" rx="6.5"/>
-    <rect x="12" y="32" width="72" height="13" rx="6.5"/>
-    <rect x="16" y="51" width="64" height="13" rx="6.5"/>
-    <rect x="26" y="70" width="44" height="13" rx="6.5"/>
+    <rect x="17" y="9" width="62" height="14" rx="7"/>
+    <rect x="8" y="30" width="80" height="14" rx="7"/>
+    <rect x="12" y="51" width="72" height="14" rx="7"/>
+    <rect x="23" y="72" width="50" height="14" rx="7"/>
   </g>
 </svg>

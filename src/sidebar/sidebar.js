@@ -212,10 +212,10 @@ async function updateActionIcon() {
       '<defs><linearGradient id="g" x1="12" y1="10" x2="84" y2="86" gradientUnits="userSpaceOnUse">' +
       '<stop offset="0" stop-color="' + a2 + '"/><stop offset="0.5" stop-color="' + a1 + '"/><stop offset="1" stop-color="' + a3 + '"/>' +
       '</linearGradient></defs><g fill="url(#g)">' +
-      '<rect x="20" y="13" width="56" height="13" rx="6.5"/>' +
-      '<rect x="12" y="32" width="72" height="13" rx="6.5"/>' +
-      '<rect x="16" y="51" width="64" height="13" rx="6.5"/>' +
-      '<rect x="26" y="70" width="44" height="13" rx="6.5"/></g></svg>';
+      '<rect x="17" y="9" width="62" height="14" rx="7"/>' +
+      '<rect x="8" y="30" width="80" height="14" rx="7"/>' +
+      '<rect x="12" y="51" width="72" height="14" rx="7"/>' +
+      '<rect x="23" y="72" width="50" height="14" rx="7"/></g></svg>';
     const img = new Image();
     await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = "data:image/svg+xml;base64," + btoa(svg); });
     const imageData = {};

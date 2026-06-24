@@ -445,7 +445,15 @@ function buildQuickNav() {
   document.querySelectorAll("main > section[id]").forEach((sec) => {
     const h = sec.querySelector("h2");
     if (!h) return;
-    const a = el("a", "qn-pin", h.textContent.trim());
+    // Split the leading emoji from the label so every emoji sits in a fixed-width
+    // column and all the labels line up cleanly.
+    const raw = h.textContent.trim();
+    const sp = raw.indexOf(" ");
+    const emoji = sp > 0 ? raw.slice(0, sp) : "";
+    const label = sp > 0 ? raw.slice(sp + 1).trim() : raw;
+    const a = el("a", "qn-pin");
+    if (emoji) a.appendChild(el("span", "qn-emoji", emoji));
+    a.appendChild(el("span", "qn-text", label));
     a.href = "#" + sec.id;
     a.addEventListener("click", (e) => {
       e.preventDefault();

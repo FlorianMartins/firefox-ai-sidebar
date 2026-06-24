@@ -106,11 +106,12 @@ section > .muted:first-of-type { margin-top: 0; }
   letter-spacing: .04em; padding: 2px 8px 6px;
 }
 .qn-pin {
-  display: block; font-size: 13px; color: var(--text); text-decoration: none;
+  display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); text-decoration: none;
   padding: 7px 10px; border: 1px solid transparent; border-radius: 9px;
-  background: transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  transition: 0.15s;
+  background: transparent; transition: 0.15s;
 }
+.qn-emoji { flex: 0 0 18px; text-align: center; font-size: 14px; line-height: 1; }
+.qn-text { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qn-pin:hover { background: var(--panel-2); border-color: var(--border); }
 .qn-pin.active { background: var(--grad); border-color: transparent; color: #fff; }
 main > section[id], section[id] { scroll-margin-top: 20px; }
