@@ -434,6 +434,22 @@ function updateQuickConnect(connectedNow) {
   }
 }
 
+// Monochrome line icons (Lucide-style) for each settings section, mirroring the
+// sidebar rail. Keyed by the section's id.
+const SECTION_ICONS = {
+  "sec-quick": '<svg viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>',
+  "sec-providers": '<svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01"/><path d="M6 18h.01"/></svg>',
+  "sec-agent": '<svg viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M9 13v2"/><path d="M15 13v2"/></svg>',
+  "sec-web": '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20"/></svg>',
+  "sec-image": '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>',
+  "sec-code": '<svg viewBox="0 0 24 24"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg>',
+  "sec-lang": '<svg viewBox="0 0 24 24"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>',
+  "sec-appearance": '<svg viewBox="0 0 24 24"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg>',
+  "sec-security": '<svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+  "sec-behavior": '<svg viewBox="0 0 24 24"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/></svg>',
+  "sec-efficiency": '<svg viewBox="0 0 24 24"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>',
+};
+
 // Quick-navigation pins: one per settings section, with smooth scroll + a scroll-spy
 // that highlights the section currently in view. Built from <section id> + its <h2>.
 function buildQuickNav() {
@@ -445,14 +461,11 @@ function buildQuickNav() {
   document.querySelectorAll("main > section[id]").forEach((sec) => {
     const h = sec.querySelector("h2");
     if (!h) return;
-    // Split the leading emoji from the label so every emoji sits in a fixed-width
-    // column and all the labels line up cleanly.
-    const raw = h.textContent.trim();
-    const sp = raw.indexOf(" ");
-    const emoji = sp > 0 ? raw.slice(0, sp) : "";
-    const label = sp > 0 ? raw.slice(sp + 1).trim() : raw;
+    const label = h.textContent.trim();
     const a = el("a", "qn-pin");
-    if (emoji) a.appendChild(el("span", "qn-emoji", emoji));
+    const ic = el("span", "qn-ic");
+    if (SECTION_ICONS[sec.id]) ic.innerHTML = SECTION_ICONS[sec.id]; // trusted static SVG
+    a.appendChild(ic);
     a.appendChild(el("span", "qn-text", label));
     a.href = "#" + sec.id;
     a.addEventListener("click", (e) => {

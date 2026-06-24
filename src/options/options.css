@@ -106,14 +106,21 @@ section > .muted:first-of-type { margin-top: 0; }
   letter-spacing: .04em; padding: 2px 8px 6px;
 }
 .qn-pin {
-  display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); text-decoration: none;
-  padding: 7px 10px; border: 1px solid transparent; border-radius: 9px;
+  position: relative; display: flex; align-items: center; gap: 9px; font-size: 13px;
+  color: #6b7280; text-decoration: none;
+  padding: 8px 10px; border: 0; border-radius: 9px;
   background: transparent; transition: 0.15s;
 }
-.qn-emoji { flex: 0 0 18px; text-align: center; font-size: 14px; line-height: 1; }
+.qn-ic { flex: 0 0 16px; display: inline-flex; align-items: center; justify-content: center; }
+.qn-ic svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .qn-text { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.qn-pin:hover { background: var(--panel-2); border-color: var(--border); }
-.qn-pin.active { background: var(--grad); border-color: transparent; color: #fff; }
+.qn-pin:hover { background: var(--panel-2); color: var(--text); }
+/* Active: subtle raised surface + a 3px accent bar on the inner edge (no violet fill). */
+.qn-pin.active { background: var(--panel-2); color: var(--text); }
+.qn-pin.active::before {
+  content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 3px;
+  border-radius: 0 3px 3px 0; background: var(--accent);
+}
 main > section[id], section[id] { scroll-margin-top: 20px; }
 
 /* Narrow window: stack the nav horizontally on top. */
