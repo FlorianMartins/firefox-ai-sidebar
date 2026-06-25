@@ -1886,10 +1886,10 @@ function closeActionBubble() {
   if (actionBubbleEl) { actionBubbleEl.remove(); actionBubbleEl = null; }
 }
 
-function actionRequest(action, text, lang) {
+function actionRequest(action, text, lang, presetId) {
   switch (action) {
     case "translate": return { label: t("rail.translate"), content: t("prompt.translate", { lang, text }), translate: true };
-    case "improve": return { label: t("rail.improve"), content: t("prompt.improve", { text }) };
+    case "improve": return { label: t("rail.improve"), content: `${t("presetPrompt." + (presetId || "improve"))}\n${t("improve.only")}\n\n${t("improve.textLabel")}\n${text}`, improve: true };
     case "summarize-selection": return { label: t("label.summarizeSel"), content: t("prompt.summarizeSel", { text }) };
     case "explain": return { label: t("label.explain"), content: t("prompt.explain", { text }) };
     case "reply": return { label: t("label.reply"), content: t("prompt.reply", { lang, text }) };
@@ -1929,13 +1929,35 @@ async function openActionBubble(action, providedText) {
   headActions.className = "ab-actions";
 
   let langSel = null;
+  let presetSel = null;
   if (reqInit && reqInit.translate) {
     langSel = document.createElement("select");
     langSel.className = "ab-lang";
     for (const o of els.translateLang.options) langSel.appendChild(o.cloneNode(true));
     langSel.value = settings.targetLang || "French";
-    langSel.addEventListener("change", () => run());
+    langSel.addEventListener("change", () => {
+      settings.targetLang = langSel.value;          // remember the last chosen language
+      setSettings({ targetLang: langSel.value });
+      run();
+    });
     headActions.appendChild(langSel);
+  }
+  if (reqInit && reqInit.improve) {
+    presetSel = document.createElement("select");
+    presetSel.className = "ab-lang";
+    for (const [id] of WRITING_PRESETS) {
+      const o = document.createElement("option");
+      o.value = id;
+      o.textContent = t("preset." + id);
+      presetSel.appendChild(o);
+    }
+    presetSel.value = settings.improvePreset || "improve";
+    presetSel.addEventListener("change", () => {
+      settings.improvePreset = presetSel.value;     // remember the last chosen style
+      setSettings({ improvePreset: presetSel.value });
+      run();
+    });
+    headActions.appendChild(presetSel);
   }
 
   const copyBtn = abIcon(
@@ -1971,9 +1993,36 @@ async function openActionBubble(action, providedText) {
   document.body.appendChild(ov);
   actionBubbleEl = ov;
 
+  // Position the card (default: upper-centre of the sidebar) and make it draggable
+  // by its header. NOTE: the sidebar is a separate panel, so it can't be placed over
+  // the web page at the exact cursor — but it can be moved freely here.
+  card.style.position = "absolute";
+  const cw = card.offsetWidth || 420;
+  card.style.left = Math.max(8, Math.round((window.innerWidth - cw) / 2)) + "px";
+  card.style.top = "44px";
+  head.style.cursor = "move";
+  head.style.userSelect = "none";
+  let ox = 0, oy = 0;
+  const onMove = (e) => {
+    let nx = e.clientX - ox, ny = e.clientY - oy;
+    nx = Math.max(4, Math.min(window.innerWidth - 60, nx));
+    ny = Math.max(4, Math.min(window.innerHeight - 36, ny));
+    card.style.left = nx + "px";
+    card.style.top = ny + "px";
+  };
+  const stopDrag = () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", stopDrag); };
+  head.addEventListener("mousedown", (e) => {
+    if (e.target.closest("button, select")) return; // controls aren't drag handles
+    const r = card.getBoundingClientRect();
+    ox = e.clientX - r.left; oy = e.clientY - r.top;
+    e.preventDefault();
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", stopDrag);
+  });
+
   async function run() {
     const lang = langSel ? langSel.value : settings.targetLang || "French";
-    const req = actionRequest(action, text, lang);
+    const req = actionRequest(action, text, lang, presetSel ? presetSel.value : settings.improvePreset);
     if (!req) return;
     const sel = currentSelection();
     if (currentKeyMissing(sel.providerId)) { body.textContent = t("err.noKeyModel"); return; }
@@ -2216,6 +2265,13 @@ function wire() {
   els.messages.addEventListener("click", (e) => {
     const img = e.target.closest && e.target.closest("img.gen-image");
     if (img) openLightbox(img.src, img.alt || "image.png");
+  });
+  // Clicking anywhere outside the Search bar or History panel closes them.
+  document.addEventListener("click", (e) => {
+    if (els.searchBar && !els.searchBar.classList.contains("hidden") &&
+        !els.searchBar.contains(e.target) && !els.searchBtn.contains(e.target)) closeSearch();
+    if (els.historyPanel && !els.historyPanel.classList.contains("hidden") &&
+        !els.historyPanel.contains(e.target) && !els.historyBtn.contains(e.target)) els.historyPanel.classList.add("hidden");
   });
   els.input.addEventListener("input", autoGrow);
   els.stop.addEventListener("click", () => abortController && abortController.abort());
@@ -2848,11 +2904,14 @@ async function runImproveFromInput() {
 }
 async function runImageFromInput() {
   const prompt = els.input.value.trim();
-  // Image generation has no img2img path here, so any pending attachments are cleared.
-  if (attachments.length) clearAttachments();
   if (!prompt) return addMessage("error", t("err.describeImage"));
+  // If an image is attached (e.g. via "reuse as context"), use it as the edit
+  // source so the model modifies it (img2img) instead of generating from scratch.
+  const att = attachments.find((a) => a.type === "image");
+  const initImage = att ? att.dataUrl : null;
+  clearAttachments();
   els.input.value = "";
-  await runImage(prompt);
+  await runImage(prompt, initImage);
 }
 
 // ----- Quick actions / context menus ----------------------------------------
@@ -2900,7 +2959,7 @@ async function runQuickAction(action, providedText) {
 }
 
 // ----- Image generation -----------------------------------------------------
-async function runImage(prompt) {
+async function runImage(prompt, initImage) {
   if (currentKeyMissing(settings.imageProvider || "openai")) {
     return addMessage("error", t("err.imageKeyMissing", { label: PROVIDERS[settings.imageProvider || "openai"].label }));
   }
@@ -2910,7 +2969,7 @@ async function runImage(prompt) {
   const status = addMessage("tool", t("image.generating"));
   startBusy();
   try {
-    const urls = await generateImage(settings, { prompt, size: els.imageSize.value, signal: abortController.signal });
+    const urls = await generateImage(settings, { prompt, size: els.imageSize.value, signal: abortController.signal, initImage });
     status.remove();
     const wrap = addMessage("assistant", "");
     for (const u of urls) {
@@ -2997,7 +3056,8 @@ async function reuseImageAsContext(src) {
       });
     }
     attachments.push({ type: "image", name: t("img.reusedName"), dataUrl, mediaType });
-    if (mode !== "chat") setMode("chat");
+    // Stay on the current tab (e.g. Image) so the user can edit the image in place
+    // (img2img); the attached image becomes the edit source for the next generation.
     renderAttachStrip();
     addMessage("tool", t("img.reused"));
     els.input.focus();

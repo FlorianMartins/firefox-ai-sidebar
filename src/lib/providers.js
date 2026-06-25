@@ -401,7 +401,7 @@ export async function transcribeAudio(settings, blob) {
 
 // -------- Image generation (OpenAI-compatible /images/generations) ----------
 // Returns a list of data: (or http) URLs to display.
-export async function generateImage(settings, { prompt, size, signal }) {
+export async function generateImage(settings, { prompt, size, signal, initImage }) {
   // size === "" (or unset) means: no fixed size — let the model use the dimensions
   // described in the prompt (and providers fall back to their own default).
   size = size != null ? size : (settings.imageSize || "");
@@ -420,12 +420,18 @@ export async function generateImage(settings, { prompt, size, signal }) {
   // API with image "modalities" rather than /images/generations. Those models have
   // no size parameter, so — as requested — we pass the size to the model as a plain
   // INSTRUCTION inside the prompt.
+  const model = settings.imageModel || (meta.imageModels && meta.imageModels[0][0]);
   if (meta.imageVia === "chat") {
-    return generateImageViaChat({ baseUrl, apiKey, providerId, model: settings.imageModel || (meta.imageModels && meta.imageModels[0][0]), prompt, size, signal });
+    return generateImageViaChat({ baseUrl, apiKey, providerId, model, prompt, size, signal, initImage });
+  }
+
+  // img2img / edit: when an input image is provided, use the /images/edits endpoint.
+  if (initImage) {
+    return generateImageEdit({ baseUrl, apiKey, model, prompt, size, signal, initImage });
   }
 
   const body = {
-    model: settings.imageModel || (meta.imageModels && meta.imageModels[0][0]),
+    model,
     prompt,
     n: 1,
   };
@@ -454,7 +460,30 @@ export async function generateImage(settings, { prompt, size, signal }) {
 // (OpenRouter, Google "Nano Banana", etc.). These models have no size parameter,
 // so the requested size is appended to the prompt as an instruction. Returns a
 // list of data: / http image URLs.
-async function generateImageViaChat({ baseUrl, apiKey, providerId, model, prompt, size, signal }) {
+// OpenAI-compatible image EDIT (img2img): multipart /images/edits with an input image.
+async function generateImageEdit({ baseUrl, apiKey, model, prompt, size, signal, initImage }) {
+  const blob = await (await fetch(initImage)).blob();
+  const fd = new FormData();
+  fd.append("model", model);
+  fd.append("prompt", prompt);
+  fd.append("n", "1");
+  if (size) fd.append("size", size);
+  fd.append("image", blob, "image.png");
+  const headers = {};
+  if (apiKey) headers.authorization = `Bearer ${apiKey}`;
+  const res = await fetch(baseUrl.replace(/\/$/, "") + "/images/edits", { method: "POST", signal, headers, body: fd });
+  await ensureOk(res);
+  const json = await res.json();
+  const out = [];
+  for (const item of json.data || []) {
+    if (item.b64_json) out.push(`data:image/png;base64,${item.b64_json}`);
+    else if (item.url) out.push(item.url);
+  }
+  if (!out.length) throw new Error("Aucune image renvoyée par l'API.");
+  return out;
+}
+
+async function generateImageViaChat({ baseUrl, apiKey, providerId, model, prompt, size, signal, initImage }) {
   const url = baseUrl.replace(/\/$/, "") + "/chat/completions";
   const headers = { "content-type": "application/json" };
   if (apiKey) headers.authorization = `Bearer ${apiKey}`;
@@ -463,10 +492,17 @@ async function generateImageViaChat({ baseUrl, apiKey, providerId, model, prompt
     headers["X-Title"] = "Hivey AI";
   }
   const sizeHint = size ? ` Target size/aspect: ${size} pixels.` : "";
+  // With an input image, send a multimodal message so the model EDITS it (img2img).
+  const content = initImage
+    ? [
+        { type: "text", text: `Edit this image as instructed: ${prompt}.${sizeHint}` },
+        { type: "image_url", image_url: { url: initImage } },
+      ]
+    : `Generate an image: ${prompt}.${sizeHint}`;
   const body = {
     model,
     modalities: ["image", "text"],
-    messages: [{ role: "user", content: `Generate an image: ${prompt}.${sizeHint}` }],
+    messages: [{ role: "user", content }],
   };
   const res = await fetch(url, { method: "POST", signal, headers, body: JSON.stringify(body) });
   await ensureOk(res);
