@@ -108,7 +108,7 @@ export async function runConversation({
   confirmFn,
   guard,
   signal,
-  maxSteps = 8,
+  maxSteps = 24,
 }) {
   for (let step = 0; step < maxSteps; step++) {
     const turn = await provider.runTurn({ system, history, tools, onText, onThink, signal });

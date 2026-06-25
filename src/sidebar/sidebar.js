@@ -1046,6 +1046,15 @@ function openInTab() {
 // so the next message can ask a question grounded in that exact element.
 let picking = false;
 let pickTabId = null;
+// Current theme accent colours, sent to the content script so its overlays
+// (pick / region capture / agent glow) match the active theme.
+function themeAccents() {
+  const cs = getComputedStyle(document.documentElement);
+  return {
+    accent: (cs.getPropertyValue("--accent") || "#8b5cf6").trim(),
+    accent2: (cs.getPropertyValue("--accent-2") || "#6366f1").trim(),
+  };
+}
 async function getActiveTab() {
   // Robust across window setups: the sidebar's currentWindow can be ambiguous, so
   // fall back to the last-focused window, then any active tab.
@@ -1122,7 +1131,7 @@ async function agentGlowActiveTab() {
     const id = await getActiveTabId();
     if (id == null) return;
     glowedTabs.add(id);
-    try { await sendToTab(id, { type: "agent_glow", on: true }); } catch (_) {}
+    try { await sendToTab(id, { type: "agent_glow", on: true, ...themeAccents() }); } catch (_) {}
   } catch (_) {}
 }
 async function clearAgentGlow() {
@@ -1161,7 +1170,7 @@ async function pickElement() {
   const note = addMessage("tool", t("pick.start"));
   let res;
   try {
-    res = await sendToTab(tabId, { type: "pick_element" });
+    res = await sendToTab(tabId, { type: "pick_element", ...themeAccents() });
   } catch (_) {
     note.remove(); finishPicking();
     addMessage("error", t("region.reload"));
@@ -1210,7 +1219,7 @@ async function captureRegion() {
   const note = addMessage("tool", t("region.start"));
   let res;
   try {
-    res = await sendToTab(tabId, { type: "capture_region" });
+    res = await sendToTab(tabId, { type: "capture_region", ...themeAccents() });
   } catch (_) {
     note.remove(); finishCapture();
     addMessage("error", t("region.reload"));
@@ -1851,7 +1860,11 @@ async function consumePendingAction() {
   if (pendingAction.ts === lastPendingTs) return; // already handled
   lastPendingTs = pendingAction.ts;
   await browser.storage.local.remove("pendingAction");
-  if (mode !== "chat" && mode !== "agent") setMode("chat"); // quick actions render in the chat area
+  // Switch to the matching workspace so the action lands on the right tab
+  // (Translate / Improve / Image), not just Chat.
+  const ACTION_MODE = { translate: "translate", improve: "improve", image: "image" };
+  const targetMode = ACTION_MODE[pendingAction.action] || "chat";
+  if (mode !== "agent" && mode !== targetMode) setMode(targetMode);
   runQuickAction(pendingAction.action, pendingAction.text);
 }
 
@@ -2042,6 +2055,21 @@ function wire() {
   // No Send button — Enter sends (Shift+Enter = newline).
   els.input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }
+  });
+  // Global Enter: send even when focus left the composer (e.g. after picking the
+  // translation language or image size in a <select>) — no need to click back in.
+  // Real text fields (search boxes, model filter) keep their own Enter behaviour.
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
+    const a = document.activeElement;
+    if (!a || a === els.input) return;                 // composer handles its own Enter
+    if (a.isContentEditable) return;
+    const tag = a.tagName;
+    if (tag === "TEXTAREA") return;
+    if (tag === "INPUT" && /^(text|search|number|email|url|password|tel)$/i.test(a.type || "text")) return;
+    if (!["chat", "agent", "translate", "improve", "image", "pdf"].includes(mode)) return;
+    e.preventDefault();
+    onSend();
   });
   els.input.addEventListener("input", autoGrow);
   els.stop.addEventListener("click", () => abortController && abortController.abort());

@@ -631,7 +631,9 @@ body.mode-code #confirmBar { display: none !important; }
   padding: 7px 9px; background: var(--panel-2);
   border-bottom: 1px solid var(--border);
 }
-.searchbar .search-ic { font-size: 13px; opacity: 0.8; }
+.searchbar .search-ic { display: inline-flex; align-items: center; color: var(--muted); }
+.panel-head .hd-ic, .pagebar .eye { display: inline-flex; align-items: center; vertical-align: -3px; color: var(--muted); }
+.panel-head .hd-ic svg, .pagebar .eye svg, .searchbar .search-ic svg { width: 15px; height: 15px; display: block; }
 .searchbar input {
   flex: 1; min-width: 0; padding: 6px 9px; font-size: 13px;
   background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: var(--text);

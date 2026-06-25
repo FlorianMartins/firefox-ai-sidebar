@@ -221,6 +221,17 @@
   // holding the left button and dragging across several elements selects them all
   // (each captured). Esc, or a pick_cancel message from the sidebar, aborts cleanly.
   let pickResolve = null;
+  // Theme accent colours — passed from the sidebar so the capture/pick overlays and
+  // the agent glow match the user's selected theme instead of a fixed colour.
+  let ACCENT = "#8b5cf6", ACCENT2 = "#6366f1";
+  function rgba(hex, a) {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec((hex || "").trim());
+    return m ? `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${a})` : hex;
+  }
+  function setAccents(msg) {
+    if (msg && msg.accent) ACCENT = msg.accent;
+    if (msg && msg.accent2) ACCENT2 = msg.accent2;
+  }
   let pickHoverBox = null;
   let pickHover = null;
   let pickPainting = false;
@@ -241,7 +252,7 @@
   function addSelected(el) {
     if (!el || pickSelected.includes(el)) return;
     pickSelected.push(el);
-    const b = mkBox("#f59e0b", "rgba(245,158,11,.22)", 2147483646);
+    const b = mkBox(ACCENT, rgba(ACCENT, 0.22), 2147483646);
     placeBox(b, el.getBoundingClientRect());
     pickBoxes.push(b);
   }
@@ -292,7 +303,7 @@
     if (pickResolve) endPick(true); // restart cleanly
     return new Promise((resolve) => {
       pickResolve = resolve; pickSelected = []; pickBoxes = []; pickPainting = false; pickHover = null;
-      pickHoverBox = mkBox("#f97316", "rgba(249,115,22,.14)", 2147483647);
+      pickHoverBox = mkBox(ACCENT2, rgba(ACCENT2, 0.14), 2147483647);
       document.documentElement.style.cursor = "crosshair";
       document.addEventListener("mousemove", pickMove, true);
       document.addEventListener("mousedown", pickDown, true);
@@ -347,7 +358,7 @@
     if (regResolve) endRegion(true);
     return new Promise((resolve) => {
       regResolve = resolve; regDragging = false; regStart = null;
-      regBox = mkBox("#f97316", "rgba(249,115,22,.14)", 2147483647);
+      regBox = mkBox(ACCENT2, rgba(ACCENT2, 0.14), 2147483647);
       document.documentElement.style.cursor = "crosshair";
       document.addEventListener("mousedown", regDown, true);
       document.addEventListener("mousemove", regMove, true);
@@ -364,14 +375,12 @@
   function setAgentGlow(on) {
     if (on) {
       if (glowEl && document.documentElement.contains(glowEl)) return;
-      if (!document.getElementById("__ai_agent_glow_style")) {
-        const st = document.createElement("style");
-        st.id = "__ai_agent_glow_style";
-        st.textContent =
-          "@keyframes aiAgentGlow{0%,100%{box-shadow:inset 0 0 16px 3px rgba(245,158,11,.55),inset 0 0 4px 1px rgba(249,115,22,.85)}50%{box-shadow:inset 0 0 36px 9px rgba(251,191,36,.8),inset 0 0 9px 2px rgba(249,115,22,1)}}" +
-          "#__ai_agent_glow{position:fixed;inset:0;z-index:2147483646;pointer-events:none;border-radius:2px;animation:aiAgentGlow 1.8s ease-in-out infinite}";
-        (document.head || document.documentElement).appendChild(st);
-      }
+      // Rebuild the style each time so the glow tracks the current theme accent.
+      let st = document.getElementById("__ai_agent_glow_style");
+      if (!st) { st = document.createElement("style"); st.id = "__ai_agent_glow_style"; (document.head || document.documentElement).appendChild(st); }
+      st.textContent =
+        `@keyframes aiAgentGlow{0%,100%{box-shadow:inset 0 0 16px 3px ${rgba(ACCENT, 0.55)},inset 0 0 4px 1px ${rgba(ACCENT2, 0.85)}}50%{box-shadow:inset 0 0 36px 9px ${rgba(ACCENT, 0.85)},inset 0 0 9px 2px ${rgba(ACCENT2, 1)}}}` +
+        "#__ai_agent_glow{position:fixed;inset:0;z-index:2147483646;pointer-events:none;border-radius:2px;animation:aiAgentGlow 1.8s ease-in-out infinite}";
       glowEl = document.createElement("div");
       glowEl.id = "__ai_agent_glow";
       document.documentElement.appendChild(glowEl);
@@ -384,6 +393,7 @@
   browser.runtime.onMessage.addListener((msg) => {
     switch (msg && msg.type) {
       case "agent_glow":
+        setAccents(msg);
         setAgentGlow(!!msg.on);
         return Promise.resolve({ ok: true });
       case "read_page":
@@ -391,11 +401,13 @@
       case "read_selection":
         return Promise.resolve(readSelection());
       case "pick_element":
+        setAccents(msg);
         return startPick();
       case "pick_cancel":
         if (pickResolve) endPick(true);
         return Promise.resolve({ ok: true });
       case "capture_region":
+        setAccents(msg);
         return startRegion();
       case "region_cancel":
         if (regResolve) endRegion(true);
