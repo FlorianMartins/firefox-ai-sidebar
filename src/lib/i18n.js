@@ -38,6 +38,8 @@ const EN = {
   "attach.remove": "Remove",
   "attach.reading": "Reading {name}…",
   "attach.tooBig": "{name} is too large (max {mb} MB).",
+  "attach.zipAdded": "✓ {n} file(s) extracted from {name} and attached as context.",
+  "attach.zipEmpty": "No readable text/image files found in {name}.",
   "attach.unsupported": "Couldn't read {name}.",
   "attach.pdfPages": "{name} · {pages} p.",
 
@@ -482,6 +484,8 @@ const FR = {
   "attach.remove": "Retirer",
   "attach.reading": "Lecture de {name}…",
   "attach.tooBig": "{name} est trop volumineux (max {mb} Mo).",
+  "attach.zipAdded": "✓ {n} fichier(s) extrait(s) de {name} et joint(s) au contexte.",
+  "attach.zipEmpty": "Aucun fichier texte/image lisible dans {name}.",
   "attach.unsupported": "Impossible de lire {name}.",
   "attach.pdfPages": "{name} · {pages} p.",
 

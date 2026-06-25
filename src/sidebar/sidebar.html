@@ -246,7 +246,7 @@
           </div>
         </div>
       </div>
-      <input type="file" id="attachInput" multiple accept="image/*,.pdf,.txt,.md,.markdown,.csv,.json,.log,.html,.xml,.yaml,.yml,.js,.ts,.py,.java,.c,.cpp,.cs,.go,.rb,.rs,.php,.sh,.css" hidden />
+      <input type="file" id="attachInput" multiple accept="image/*,.pdf,.zip,.txt,.md,.markdown,.csv,.json,.log,.html,.xml,.yaml,.yml,.js,.ts,.py,.java,.c,.cpp,.cs,.go,.rb,.rs,.php,.sh,.css" hidden />
     </footer>
 
       </div><!-- /#workArea -->
@@ -258,6 +258,8 @@
     <script src="../../vendor/purify.min.js"></script>
     <!-- pdf.js (Mozilla) for the PDF workspace: text + page-image extraction. -->
     <script src="../../vendor/pdf.min.js"></script>
+    <!-- JSZip: extract .zip attachments (each text file becomes context). -->
+    <script src="../../vendor/jszip.min.js"></script>
     <script type="module" src="sidebar.js"></script>
   </body>
 </html>

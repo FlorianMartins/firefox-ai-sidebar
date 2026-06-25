@@ -13,7 +13,7 @@ shipped **unmodified** from their official releases (verifiable by SHA-256, see 
 
 - Source repository: https://github.com/FlorianMartins/ai-sidebar-open-router
 - The submitted package corresponds to the git tag matching its `version`
-  (e.g. version `1.32.0` → tag `v1.32.0`).
+  (e.g. version `1.33.0` → tag `v1.33.0`).
 
 ---
 
@@ -60,7 +60,7 @@ optional lint/sign steps.)
 # 1. Get the exact source for this version
 git clone https://github.com/FlorianMartins/ai-sidebar-open-router.git
 cd ai-sidebar-open-router
-git checkout v1.32.0            # use the tag matching the submitted version
+git checkout v1.33.0            # use the tag matching the submitted version
 
 # 2. (Optional) verify the third-party libs are the unmodified upstream releases
 bash scripts/fetch-vendor.sh --check
@@ -71,8 +71,8 @@ bash scripts/build.sh
 
 This produces, in the repository root:
 
-- `ai-sidebar-1.32.0-firefox.zip`  (Firefox — built from `manifest.json`)
-- `ai-sidebar-chrome-1.32.0.zip`   (Chromium — built from `manifest.chrome.json`)
+- `ai-sidebar-1.33.0-firefox.zip`  (Firefox — built from `manifest.json`)
+- `ai-sidebar-chrome-1.33.0.zip`   (Chromium — built from `manifest.chrome.json`)
 
 The contents of `ai-sidebar-<version>-firefox.zip` are byte-for-byte the files under
 `src/`, `icons/`, `vendor/`, plus `manifest.json`, `LICENSE` and `README.md` — i.e.
@@ -101,6 +101,7 @@ each from its official source and verifies it against the SHA-256 below.
 |-----------------------------|------------------------|------------|------------------------------------|---------|
 | `marked.min.js`             | marked                 | 12.0.2     | `marked@12.0.2/marked.min.js` | `15fabce5…a847a894` |
 | `purify.min.js`             | DOMPurify              | 3.1.6      | `dompurify@3.1.6/dist/purify.min.js` | `c0845096…f2dbe3a1` |
+| `jszip.min.js`              | JSZip                  | 3.10.1     | `jszip@3.10.1/dist/jszip.min.js` | `acc7e414…c947d59e` |
 | `browser-polyfill.min.js`   | webextension-polyfill  | 0.12.0     | `webextension-polyfill@0.12.0/dist/browser-polyfill.min.js` | `918ed891…7572cc21` |
 | `mermaid.min.js`            | Mermaid                | 10.9.1     | `mermaid@10.9.1/dist/mermaid.min.js` | `61b335a4…04a936d6` |
 | `pdf.min.js`                | PDF.js (pdfjs-dist)    | 3.11.174   | `pdfjs-dist@3.11.174/legacy/build/pdf.min.js` | `978fd1b2…21a5aa6c` |

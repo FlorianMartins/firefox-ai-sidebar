@@ -941,8 +941,10 @@ async function addAttachmentFiles(fileList) {
 async function readOneAttachment(file) {
   const isImage = (file.type || "").startsWith("image/");
   const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+  const isZip = /\.zip$/i.test(file.name) || file.type === "application/zip" || file.type === "application/x-zip-compressed";
   const maxMB = isImage ? ATT_IMG_MAX_MB : ATT_TXT_MAX_MB;
   if (file.size > maxMB * 1024 * 1024) { addMessage("error", t("attach.tooBig", { name: file.name, mb: maxMB })); return; }
+  if (isZip) { await readZipAttachment(file); return; }
   if (isImage) {
     const dataUrl = await readFileAs(file, "dataURL");
     attachments.push({ type: "image", name: file.name, dataUrl, mediaType: file.type || "image/png" });
@@ -954,6 +956,43 @@ async function readOneAttachment(file) {
     const text = await readFileAs(file, "text");
     attachments.push({ type: "text", name: file.name, text: text || "" });
   }
+}
+// Extract a .zip and attach its contents: each readable text file becomes a text
+// attachment (its path + content), images become image attachments. Lets the AI see
+// a whole codebase / set of files at once. Skips binaries and very large entries.
+async function readZipAttachment(file) {
+  if (!window.JSZip) { addMessage("error", t("attach.unsupported", { name: file.name })); return; }
+  let zip;
+  try { zip = await window.JSZip.loadAsync(await file.arrayBuffer()); }
+  catch (_) { addMessage("error", t("attach.unsupported", { name: file.name })); return; }
+  const base = file.name.replace(/\.zip$/i, "");
+  const entries = Object.values(zip.files).filter((e) => !e.dir);
+  let added = 0;
+  for (const entry of entries) {
+    if (added >= 80) break; // safety cap on number of files
+    const p = entry.name.replace(/^\/+/, "");
+    if (!p || /(^|\/)(node_modules|\.git)\//.test(p)) continue;
+    try {
+      if (/\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(p)) {
+        const blob = await entry.async("blob");
+        if (blob.size <= ATT_IMG_MAX_MB * 1024 * 1024) {
+          const dataUrl = await readFileAs(blob, "dataURL");
+          attachments.push({ type: "image", name: `${base}/${p}`, dataUrl, mediaType: blob.type || "image/png" });
+          added++;
+        }
+        continue;
+      }
+      const u8 = await entry.async("uint8array");
+      if (u8.length > 2 * 1024 * 1024 || u8.includes(0)) continue; // skip huge / binary files
+      let text;
+      try { text = new TextDecoder("utf-8", { fatal: true }).decode(u8); }
+      catch (_) { continue; }
+      attachments.push({ type: "text", name: `${base}/${p}`, text });
+      added++;
+    } catch (_) { /* skip unreadable entry */ }
+  }
+  if (added) addMessage("tool", t("attach.zipAdded", { n: added, name: file.name }));
+  else addMessage("error", t("attach.zipEmpty", { name: file.name }));
 }
 function readFileAs(file, how) {
   return new Promise((res, rej) => {
